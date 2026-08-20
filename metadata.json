@@ -1,0 +1,6 @@
+{
+  "name": "KW Grocery & Dinner Meal Planner",
+  "description": "Weekly dinner meal planning and grocery budget optimizer tailored to Waterloo, ON store flyers (Food Basics, Superstore Boardwalk, Zehrs Conestoga, Sobeys Columbia).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
