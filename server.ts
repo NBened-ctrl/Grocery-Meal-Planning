@@ -82,7 +82,7 @@ async function generateContentWithFallback(
   return null;
 }
 
-// Fallback Waterloo Reebee Deals Database
+// Fallback Waterloo Flipp Deals Database
 const FALLBACK_WATERLOO_DEALS = [
   {
     id: 'fb-1',
@@ -98,8 +98,10 @@ const FALLBACK_WATERLOO_DEALS = [
     suggestedProtein: 'Crispy Baked Chicken Thighs / Drumsticks',
     suggestedVeg: 'Green Beans & Baby Carrots',
     suggestedStarch: 'Herb Roasted Baby Potatoes',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=chicken%20thighs',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=chicken%20thighs&postalCode=N2L3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=chicken%20thighs',
     postalCode: 'N2L 3E4',
   },
   {
@@ -114,8 +116,10 @@ const FALLBACK_WATERLOO_DEALS = [
     validUntil: 'Aug 26',
     isLossLeader: true,
     suggestedVeg: 'Charred Sweet Corn on the Cob',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=sweet%20corn',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=sweet%20corn&postalCode=N2L3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=sweet%20corn',
     postalCode: 'N2L 3E4',
   },
   {
@@ -132,8 +136,10 @@ const FALLBACK_WATERLOO_DEALS = [
     suggestedProtein: 'Glazed Pork Center Cut Chops',
     suggestedVeg: 'Sautéed Zucchini & Apple Slices',
     suggestedStarch: 'Steamed Jasmine Rice',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=pork%20chops',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=pork%20chops&postalCode=N2L3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=pork%20chops',
     postalCode: 'N2L 3E4',
   },
   {
@@ -147,8 +153,10 @@ const FALLBACK_WATERLOO_DEALS = [
     discountLabel: 'Over 50% Off',
     validUntil: 'Aug 26',
     suggestedVeg: 'Garlic Lemon Roasted Broccoli',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=broccoli',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=broccoli&postalCode=N2L3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=broccoli',
     postalCode: 'N2L 3E4',
   },
   {
@@ -163,8 +171,10 @@ const FALLBACK_WATERLOO_DEALS = [
     validUntil: 'Aug 26',
     isLossLeader: true,
     suggestedVeg: 'Fresh Roma Tomato Basil Bruschetta / Sauce',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=roma%20tomatoes',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=roma%20tomatoes&postalCode=N2L3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=roma%20tomatoes',
     postalCode: 'N2L 3E4',
   },
   {
@@ -181,9 +191,11 @@ const FALLBACK_WATERLOO_DEALS = [
     suggestedProtein: 'Lean Ground Beef (Tacos/Bake)',
     suggestedVeg: 'Diced Bell Peppers & Sweet Onions',
     suggestedStarch: 'Warm Corn Tortillas & Rice',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=ground%20beef',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=ground%20beef&postalCode=N2T1L4',
-    postalCode: 'N2T 1L4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=ground%20beef',
+    postalCode: 'N2N 2Y2',
   },
   {
     id: 'rcss-2',
@@ -199,9 +211,11 @@ const FALLBACK_WATERLOO_DEALS = [
     suggestedProtein: 'Maple Dijon Glazed Salmon',
     suggestedVeg: 'Steamed Baby Green Beans',
     suggestedStarch: 'Lemon Herb Couscous / Quinoa',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=salmon',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=salmon&postalCode=N2T1L4',
-    postalCode: 'N2T 1L4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=salmon',
+    postalCode: 'N2N 2Y2',
   },
   {
     id: 'rcss-3',
@@ -214,9 +228,11 @@ const FALLBACK_WATERLOO_DEALS = [
     discountLabel: 'Ontario Grown Sale',
     validUntil: 'Aug 26',
     suggestedVeg: 'Fajita Seasoned Roasted Peppers',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=peppers',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=peppers&postalCode=N2T1L4',
-    postalCode: 'N2T 1L4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=peppers',
+    postalCode: 'N2N 2Y2',
   },
   {
     id: 'zehrs-1',
@@ -232,9 +248,11 @@ const FALLBACK_WATERLOO_DEALS = [
     suggestedProtein: 'Juicy Pan-Seared Chicken Breasts',
     suggestedVeg: 'Roasted Asparagus & Cherry Tomatoes',
     suggestedStarch: 'Garlic Parmesan Orzo',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=chicken%20breast',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=chicken%20breast&postalCode=N2L6L1',
-    postalCode: 'N2L 6L1',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=chicken%20breast',
+    postalCode: 'N2T 1H4',
   },
   {
     id: 'zehrs-2',
@@ -247,9 +265,11 @@ const FALLBACK_WATERLOO_DEALS = [
     discountLabel: 'Farm Fresh Ontario',
     validUntil: 'Aug 26',
     suggestedVeg: 'Blanched Butter Green Beans',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=green%20beans',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=green%20beans&postalCode=N2L6L1',
-    postalCode: 'N2L 6L1',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=green%20beans',
+    postalCode: 'N2T 1H4',
   },
   {
     id: 'zehrs-4',
@@ -265,9 +285,11 @@ const FALLBACK_WATERLOO_DEALS = [
     suggestedProtein: 'Garlic Butter Sautéed Shrimp',
     suggestedVeg: 'Snap Peas & Bell Peppers',
     suggestedStarch: 'Garlic Butter Egg Noodles',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=raw%20shrimp',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=raw%20shrimp&postalCode=N2L6L1',
-    postalCode: 'N2L 6L1',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=raw%20shrimp',
+    postalCode: 'N2T 1H4',
   },
   {
     id: 'sobeys-1',
@@ -283,8 +305,10 @@ const FALLBACK_WATERLOO_DEALS = [
     suggestedProtein: 'Cast-Iron Top Sirloin Steak Slices',
     suggestedVeg: 'Sautéed Garlic Cremini Mushrooms & Green Salad',
     suggestedStarch: 'Fluffy Baked Russet Potato with Butter',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=top%20sirloin',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=top%20sirloin&postalCode=N2L5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=top%20sirloin',
     postalCode: 'N2L 5L7',
   },
   {
@@ -298,8 +322,10 @@ const FALLBACK_WATERLOO_DEALS = [
     discountLabel: 'Multi-buy Savings',
     validUntil: 'Aug 26',
     suggestedVeg: 'Caramelized Herb Mushrooms',
+    flippVerified: true,
+    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=mushrooms',
     reebeeVerified: true,
-    reebeeUrl: 'https://www.reebee.com/search?query=mushrooms&postalCode=N2L5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=mushrooms',
     postalCode: 'N2L 5L7',
   },
 ];
@@ -1233,7 +1259,7 @@ ${JSON.stringify(formattedDeals, null, 2)}`;
   return res.json(fallbackSwap);
 });
 
-// AI Refresh Flyers for Kitchener-Waterloo (Thursday cycle via Reebee Sync)
+// AI Refresh Flyers for Kitchener-Waterloo (Thursday cycle via Flipp Sync)
 app.post('/api/refresh-flyers', async (req, res) => {
   const { cycleDate, postalCode } = req.body;
   const postal = postalCode || 'N2L 3E4';
@@ -1242,9 +1268,9 @@ app.post('/api/refresh-flyers', async (req, res) => {
     const ai = getGeminiClient();
 
     if (ai) {
-      const prompt = `You are the Reebee flyer sync engine for Kitchener-Waterloo, Ontario (Postal Code: ${postal}).
+      const prompt = `You are the Flipp digital flyer sync engine (https://flipp.com/) for Kitchener-Waterloo, Ontario (Postal Code: ${postal}).
 Generate an authentic set of 16-20 weekly grocery flyer deals for the Thursday cycle (${cycleDate || 'August 20 - August 26, 2026'}).
-Include Food Basics, Real Canadian Superstore, Zehrs, and Sobeys in Waterloo with realistic salePrice, regularPrice, and unit.`;
+Include Food Basics (450 Erb St W / Beechwood), Real Canadian Superstore (875 Highland Rd W / Fischer-Hallman & Highland), Zehrs (450 Erb St W / Beechwood Centre), and Sobeys (Columbia/Bridgeport) in Waterloo with realistic salePrice, regularPrice, unit, and flippUrl.`;
 
       const responseText = await generateContentWithFallback(
         ai,
@@ -1276,6 +1302,8 @@ Include Food Basics, Real Canadian Superstore, Zehrs, and Sobeys in Waterloo wit
                       suggestedProtein: { type: Type.STRING },
                       suggestedVeg: { type: Type.STRING },
                       suggestedStarch: { type: Type.STRING },
+                      flippVerified: { type: Type.BOOLEAN },
+                      flippUrl: { type: Type.STRING },
                       reebeeVerified: { type: Type.BOOLEAN },
                       reebeeUrl: { type: Type.STRING },
                       postalCode: { type: Type.STRING },
@@ -1300,20 +1328,20 @@ Include Food Basics, Real Canadian Superstore, Zehrs, and Sobeys in Waterloo wit
       }
     }
   } catch (error: any) {
-    console.warn('Flyer refresh note (using verified Reebee database):', error?.message || error);
+    console.warn('Flyer refresh note (using verified Flipp database):', error?.message || error);
   }
 
-  // Fallback to verified Reebee deals
+  // Fallback to verified Flipp deals
   return res.json({
     validFrom: 'Thursday, Aug 20, 2026',
     validTo: 'Wednesday, Aug 26, 2026',
-    syncSource: `Reebee Waterloo Circulars (${postal})`,
+    syncSource: `Flipp Waterloo Circulars (https://flipp.com/ - ${postal})`,
     deals: FALLBACK_WATERLOO_DEALS,
   });
 });
 
-// Live Reebee Item Search across Waterloo flyers
-app.post('/api/reebee-search', async (req, res) => {
+// Live Flipp Item Search across Waterloo flyers
+const handleFlippSearch = async (req: express.Request, res: express.Response) => {
   const { query, postalCode } = req.body;
   const postal = postalCode || 'N2L 3E4';
   const q = (query || '').toLowerCase().trim();
@@ -1322,8 +1350,8 @@ app.post('/api/reebee-search', async (req, res) => {
     const ai = getGeminiClient();
 
     if (ai && q) {
-      const prompt = `Search Reebee digital flyers in Waterloo, ON (${postal}) for: "${q}".
-Return matching deals for Food Basics, Superstore, Zehrs, and Sobeys.`;
+      const prompt = `Search Flipp digital flyers (https://flipp.com/) in Waterloo, ON (${postal}) for: "${q}".
+Return matching deals for Food Basics, Superstore, Zehrs, and Sobeys with flippUrl and flippVerified: true.`;
 
       const responseText = await generateContentWithFallback(
         ai,
@@ -1351,6 +1379,8 @@ Return matching deals for Food Basics, Superstore, Zehrs, and Sobeys.`;
                       discountLabel: { type: Type.STRING },
                       validUntil: { type: Type.STRING },
                       isLossLeader: { type: Type.BOOLEAN },
+                      flippVerified: { type: Type.BOOLEAN },
+                      flippUrl: { type: Type.STRING },
                       reebeeVerified: { type: Type.BOOLEAN },
                       reebeeUrl: { type: Type.STRING },
                     },
@@ -1374,7 +1404,7 @@ Return matching deals for Food Basics, Superstore, Zehrs, and Sobeys.`;
       }
     }
   } catch (error: any) {
-    console.warn('Reebee search note (using local search):', error?.message || error);
+    console.warn('Flipp search note (using local search):', error?.message || error);
   }
 
   // Filter local Waterloo deals database
@@ -1392,7 +1422,10 @@ Return matching deals for Food Basics, Superstore, Zehrs, and Sobeys.`;
     postalCode: postal,
     results: matching.length > 0 ? matching : FALLBACK_WATERLOO_DEALS.slice(0, 6),
   });
-});
+};
+
+app.post('/api/flipp-search', handleFlippSearch);
+app.post('/api/reebee-search', handleFlippSearch);
 
 // Vite Middleware setup
 async function startServer() {

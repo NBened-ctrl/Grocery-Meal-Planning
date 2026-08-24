@@ -51,7 +51,7 @@ export const StoreComparisonModal: React.FC<StoreComparisonModalProps> = ({
     {
       name: 'Real Canadian Superstore' as KWStore,
       tagline: 'Best One-Stop Club Size & Points',
-      description: 'Massive selection at Erbsville & Fischer-Hallman. Earn PC Optimum points on bulk family packs.',
+      description: 'Fischer-Hallman & Highland location (875 Highland Rd W). Earn PC Optimum points on bulk family packs and club meat.',
       estWeeklyCost: currentWeeklyCost + 10.80,
       savingsVsSobeys: 14.80,
       stopsCount: '1 single store stop',
@@ -61,7 +61,7 @@ export const StoreComparisonModal: React.FC<StoreComparisonModalProps> = ({
     {
       name: 'Zehrs' as KWStore,
       tagline: 'Fresh Quality & Seafood Focus',
-      description: 'Premium meat cuts, fresh bakery, local Ontario seasonal produce at Conestoga Mall or Erb St W.',
+      description: 'Beechwood Zehrs (450 Erb St W) - Premium butchery cuts, fresh seafood counter, and local Ontario seasonal harvest produce.',
       estWeeklyCost: currentWeeklyCost + 19.20,
       savingsVsSobeys: 6.40,
       stopsCount: '1 single store stop',

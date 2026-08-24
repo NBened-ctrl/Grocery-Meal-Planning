@@ -34,10 +34,11 @@ interface FlyerBrowserProps {
 }
 
 const WATERLOO_POSTAL_CODES = [
-  { code: 'N2L 3E4', label: 'N2L - University District / Lakeshore / Northfield' },
-  { code: 'N2T 1H4', label: 'N2T - Beechwood / The Boardwalk' },
+  { code: 'N2T 1H4', label: 'N2T - Beechwood (Zehrs Beechwood & Food Basics Erb St)' },
+  { code: 'N2N 2Y2', label: 'N2N - Fischer-Hallman & Highland (Real Canadian Superstore)' },
+  { code: 'N2L 3E4', label: 'N2L - University District / Columbia (Sobeys Columbia)' },
   { code: 'N2J 4H7', label: 'N2J - Lincoln Heights / Uptown Waterloo' },
-  { code: 'N2V 1Z8', label: 'N2V - Westvale / Erbsville' },
+  { code: 'N2V 1Z8', label: 'N2V - Westvale / Erbsville / The Boardwalk' },
 ];
 
 export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
@@ -54,9 +55,9 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
   const [onlyLossLeaders, setOnlyLossLeaders] = useState<boolean>(false);
   const [addedDealIds, setAddedDealIds] = useState<Record<string, boolean>>({});
   const [isBannerCollapsed, setIsBannerCollapsed] = useState<boolean>(false);
-  const [selectedPostalCode, setSelectedPostalCode] = useState<string>(flyerWeek.reebeePostalCode || 'N2L 3E4');
+  const [selectedPostalCode, setSelectedPostalCode] = useState<string>(flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 3E4');
 
-  // Reebee live item search state
+  // Flipp live item search state
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
   const [isSearchingLive, setIsSearchingLive] = useState<boolean>(false);
   const [liveSearchResults, setLiveSearchResults] = useState<FlyerDeal[] | null>(null);
@@ -80,7 +81,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
     salePrice: '',
     regularPrice: '',
     unit: 'per lb',
-    discountLabel: 'Reebee Deal',
+    discountLabel: 'Flipp Deal',
     isLossLeader: false,
   });
 
@@ -102,7 +103,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
     }, 2000);
   };
 
-  const handleTriggerReebeeSync = () => {
+  const handleTriggerFlippSync = () => {
     onRefreshFlyersAI(selectedPostalCode);
   };
 
@@ -113,7 +114,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
     setIsSearchingLive(true);
     setLiveSearchError(null);
     try {
-      const res = await fetch('/api/reebee-search', {
+      const res = await fetch('/api/flipp-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -156,20 +157,23 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
 
     const sale = parseFloat(manualDeal.salePrice) || 0;
     const reg = parseFloat(manualDeal.regularPrice) || sale * 1.3;
+    const cleanPostal = selectedPostalCode.replace(/\s+/g, '');
 
     const newDeal: FlyerDeal = {
-      id: `manual-reebee-${Date.now()}`,
+      id: `manual-flipp-${Date.now()}`,
       store: manualDeal.store,
       name: manualDeal.name.trim(),
       category: manualDeal.category,
       salePrice: sale,
       regularPrice: reg,
       unit: manualDeal.unit || 'each',
-      discountLabel: manualDeal.discountLabel || 'Reebee Clipped Price',
+      discountLabel: manualDeal.discountLabel || 'Flipp Clipped Price',
       validUntil: flyerWeek.validTo,
       isLossLeader: manualDeal.isLossLeader,
+      flippVerified: true,
+      flippUrl: `https://flipp.com/search?postal_code=${cleanPostal}&query=${encodeURIComponent(manualDeal.name)}`,
       reebeeVerified: true,
-      reebeeUrl: `https://www.reebee.com/search?query=${encodeURIComponent(manualDeal.name)}&postalCode=${selectedPostalCode.replace(/\s+/g, '')}`,
+      reebeeUrl: `https://flipp.com/search?postal_code=${cleanPostal}&query=${encodeURIComponent(manualDeal.name)}`,
       postalCode: selectedPostalCode,
     };
 
@@ -185,7 +189,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
       salePrice: '',
       regularPrice: '',
       unit: 'per lb',
-      discountLabel: 'Reebee Deal',
+      discountLabel: 'Flipp Deal',
       isLossLeader: false,
     });
   };
@@ -209,14 +213,14 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Reebee Integration Header & Sync Banner */}
+      {/* Flipp Integration Header & Sync Banner */}
       <div className="bg-white rounded-2xl border border-stone-200/90 shadow-xs overflow-hidden">
-        {/* Top Dark Bar with Reebee Status & Postal Code */}
+        {/* Top Dark Bar with Flipp Status & Postal Code */}
         <div className="p-4 sm:p-5 bg-stone-900 text-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
               <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-              Reebee Waterloo Live Sync
+              Flipp Waterloo Live Sync
             </span>
             <span className="text-xs text-stone-300 font-normal flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-stone-400" />
@@ -244,13 +248,13 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
 
             {/* Sync Button */}
             <button
-              id="btn-refresh-flyers-reebee"
-              onClick={handleTriggerReebeeSync}
+              id="btn-refresh-flyers-flipp"
+              onClick={handleTriggerFlippSync}
               disabled={isRefreshing}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-amber-200 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? 'Syncing...' : 'Sync Reebee'}</span>
+              <span>{isRefreshing ? 'Syncing...' : 'Sync Flipp Flyers'}</span>
             </button>
 
             {/* Manual Clip Button */}
@@ -280,33 +284,33 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
-                    Waterloo Grocery Flyers & Reebee Price Accuracy Engine
+                    Waterloo Grocery Flyers & Flipp.com Deals Engine
                   </h2>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 text-[11px] font-semibold">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                    Verified Prices
+                    Verified Flipp Prices
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-stone-600 font-normal max-w-3xl mt-1 leading-relaxed">
-                  Real-time flyer deals pulled from Reebee digital circulars for Kitchener-Waterloo. Browse verified loss-leaders across Food Basics, Superstore, Zehrs, and Sobeys to power budget meal planning.
+                  Real-time flyer deals pulled from Flipp.com digital circulars for Kitchener-Waterloo (Food Basics, Real Canadian Superstore, Zehrs, and Sobeys). Verified loss-leaders power weekly family dinner planning.
                 </p>
               </div>
 
-              {/* Direct Reebee Circular Links */}
+              {/* Direct Flipp Circular Links */}
               <div className="flex items-center gap-2 flex-wrap">
                 <a
-                  href={`https://www.reebee.com/flyers?postalCode=${selectedPostalCode.replace(/\s+/g, '')}`}
+                  href={`https://flipp.com/flyers?postal_code=${selectedPostalCode.replace(/\s+/g, '')}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-semibold border border-stone-300 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-semibold border border-emerald-200 transition-colors"
                 >
-                  <span>Open Reebee.com</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-stone-500" />
+                  <span>Open Flipp.com</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
                 </a>
               </div>
             </div>
 
-            {/* Store Tabs Grid with Direct Reebee Links */}
+            {/* Store Tabs Grid with Direct Flipp Links */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-3 border-t border-stone-100">
               <button
                 onClick={() => setSelectedStore('All')}
@@ -324,6 +328,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                 const count = deals.filter((d) => d.store === store).length;
                 const isSelected = selectedStore === store;
                 const meta = STORE_METADATA[store];
+                const directUrl = meta?.flippDirectUrl || meta?.reebeeDirectUrl;
 
                 return (
                   <div
@@ -345,12 +350,12 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                         {meta?.neighborhood || 'Waterloo'} • {count} deals
                       </div>
                     </button>
-                    {meta?.reebeeDirectUrl && (
+                    {directUrl && (
                       <a
-                        href={meta.reebeeDirectUrl}
+                        href={directUrl}
                         target="_blank"
                         rel="noreferrer"
-                        title={`View ${store} flyer on Reebee`}
+                        title={`View ${store} flyer on Flipp`}
                         className={`absolute top-2.5 right-2.5 p-1 rounded-md transition-colors ${
                           isSelected ? 'text-stone-300 hover:text-white' : 'text-stone-400 hover:text-stone-900'
                         }`}
@@ -366,16 +371,16 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
         )}
       </div>
 
-      {/* Reebee Live Product Search Across Waterloo Flyers */}
+      {/* Flipp Live Product Search Across Waterloo Flyers */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h3 className="font-serif font-bold text-stone-900 text-base flex items-center gap-2">
               <Search className="w-4 h-4 text-emerald-700" />
-              Live Reebee Flyer Deal Search
+              Live Flipp Flyer Deal Search
             </h3>
             <p className="text-xs text-stone-500 font-normal mt-0.5">
-              Query any ingredient or product across all 4 Waterloo store circulars to verify prices instantly.
+              Query any grocery item across all 4 Waterloo store circulars to verify prices on Flipp.com instantly.
             </p>
           </div>
 
@@ -383,7 +388,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
           <form onSubmit={handleExecuteLiveSearch} className="flex items-center gap-2 w-full md:w-auto">
             <div className="relative flex-1 md:w-72">
               <input
-                id="input-reebee-live-query"
+                id="input-flipp-live-query"
                 type="text"
                 placeholder="e.g. chicken breast, ground beef, corn..."
                 value={liveSearchQuery}
@@ -404,7 +409,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
               )}
             </div>
             <button
-              id="btn-submit-reebee-search"
+              id="btn-submit-flipp-search"
               type="submit"
               disabled={isSearchingLive || !liveSearchQuery.trim()}
               className="px-3.5 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition-colors shrink-0 flex items-center gap-1.5 shadow-xs"
@@ -430,7 +435,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-stone-800 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                Found {liveSearchResults.length} Reebee Results for "{liveSearchQuery}" ({selectedPostalCode})
+                Found {liveSearchResults.length} Flipp Results for "{liveSearchQuery}" ({selectedPostalCode})
               </span>
               <button
                 onClick={() => setLiveSearchResults(null)}
@@ -446,48 +451,51 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-                {liveSearchResults.map((deal) => (
-                  <div
-                    key={deal.id}
-                    className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-2xs flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between text-[10px] mb-1">
-                        <span className="font-semibold text-stone-700">{deal.store}</span>
-                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold">
-                          {deal.discountLabel || 'Flyer Deal'}
-                        </span>
+                {liveSearchResults.map((deal) => {
+                  const dealUrl = deal.flippUrl || deal.reebeeUrl;
+                  return (
+                    <div
+                      key={deal.id}
+                      className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-2xs flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] mb-1">
+                          <span className="font-semibold text-stone-700">{deal.store}</span>
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold">
+                            {deal.discountLabel || 'Flyer Deal'}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-bold text-stone-900 line-clamp-1">{deal.name}</h4>
+                        <div className="mt-2 flex items-baseline gap-1.5">
+                          <span className="font-serif text-lg font-bold text-stone-900">
+                            ${deal.salePrice.toFixed(2)}
+                          </span>
+                          <span className="text-[11px] text-stone-500 font-normal">{deal.unit}</span>
+                        </div>
                       </div>
-                      <h4 className="text-xs font-bold text-stone-900 line-clamp-1">{deal.name}</h4>
-                      <div className="mt-2 flex items-baseline gap-1.5">
-                        <span className="font-serif text-lg font-bold text-stone-900">
-                          ${deal.salePrice.toFixed(2)}
-                        </span>
-                        <span className="text-[11px] text-stone-500 font-normal">{deal.unit}</span>
-                      </div>
-                    </div>
 
-                    <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
-                      {deal.reebeeUrl && (
-                        <a
-                          href={deal.reebeeUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-stone-500 hover:text-stone-900 flex items-center gap-1"
+                      <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                        {dealUrl && (
+                          <a
+                            href={dealUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-emerald-800 hover:text-emerald-950 flex items-center gap-1 font-medium"
+                          >
+                            <span>Flipp</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleAdd(deal)}
+                          className="px-2.5 py-1 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors ml-auto"
                         >
-                          <span>Reebee</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      <button
-                        onClick={() => handleAdd(deal)}
-                        className="px-2.5 py-1 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors ml-auto"
-                      >
-                        + Add to List
-                      </button>
+                          + Add to List
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -561,6 +569,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
             ((deal.regularPrice - deal.salePrice) / deal.regularPrice) * 100
           );
           const isAdded = addedDealIds[deal.id];
+          const dealUrl = deal.flippUrl || deal.reebeeUrl;
 
           return (
             <div
@@ -579,7 +588,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                         : deal.store === 'Real Canadian Superstore'
                         ? 'bg-blue-50 text-blue-800 border-blue-200'
                         : deal.store === 'Zehrs'
-                        ? 'bg-amber-50 text-amber-900 border-amber-200'
+                        ? 'bg-rose-50 text-rose-800 border-rose-200'
                         : 'bg-teal-50 text-teal-800 border-teal-200'
                     }`}
                   >
@@ -587,10 +596,10 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                   </span>
 
                   <div className="flex items-center gap-1.5">
-                    {deal.reebeeVerified && (
+                    {(deal.flippVerified || deal.reebeeVerified) && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        Reebee Verified
+                        Flipp Verified
                       </span>
                     )}
 
@@ -643,18 +652,18 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                 )}
               </div>
 
-              {/* Action Buttons & Reebee Link */}
+              {/* Action Buttons & Flipp Link */}
               <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between gap-2">
-                {deal.reebeeUrl && (
+                {dealUrl && (
                   <a
-                    href={deal.reebeeUrl}
+                    href={dealUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] font-medium text-stone-500 hover:text-stone-900 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-stone-100 transition-colors"
-                    title="View item on Reebee"
+                    className="text-[11px] font-medium text-stone-600 hover:text-stone-950 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-stone-100 transition-colors"
+                    title="View item on Flipp.com"
                   >
-                    <span>View on Reebee</span>
-                    <ExternalLink className="w-3 h-3" />
+                    <span>View on Flipp</span>
+                    <ExternalLink className="w-3 h-3 text-stone-400" />
                   </a>
                 )}
 
@@ -695,14 +704,14 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
         </div>
       )}
 
-      {/* Manual Clip Reebee Deal Modal */}
+      {/* Manual Clip Flipp Deal Modal */}
       {isManualModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl border border-stone-200 max-w-md w-full p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <h3 className="font-serif font-bold text-stone-900 text-lg flex items-center gap-2">
                 <Plus className="w-4 h-4 text-emerald-600" />
-                Clip Deal from Reebee App
+                Clip Deal from Flipp App
               </h3>
               <button
                 onClick={() => setIsManualModalOpen(false)}

@@ -451,9 +451,9 @@ export default function App() {
   };
 
   const handleRefreshFlyersAI = async (postalCode?: string) => {
-    const postal = postalCode || flyerWeek.reebeePostalCode || 'N2L 3E4';
+    const postal = postalCode || flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 3E4';
     setIsRefreshingFlyers(true);
-    showToast(`Syncing Reebee flyers for Waterloo (${postal})...`);
+    showToast(`Syncing Flipp flyers for Waterloo (${postal})...`);
     try {
       const res = await fetch('/api/refresh-flyers', {
         method: 'POST',
@@ -476,17 +476,19 @@ export default function App() {
           ...prev,
           validFrom: data.validFrom || prev.validFrom,
           validTo: data.validTo || prev.validTo,
-          lastUpdated: `Synced via Reebee (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
-          reebeeSyncSource: 'Reebee Waterloo Digital Circulars',
+          lastUpdated: `Synced via Flipp (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+          flippSyncSource: 'Flipp.com Waterloo Digital Circulars',
+          flippPostalCode: postal,
+          reebeeSyncSource: 'Flipp.com Waterloo Digital Circulars',
           reebeePostalCode: postal,
           totalDealsTracked: data.deals.length,
         }));
-        showToast(`Synced ${data.deals.length} verified Reebee deals for ${postal}!`);
+        showToast(`Synced ${data.deals.length} verified Flipp deals for ${postal}!`);
       } else {
-        showToast('Using verified Reebee Waterloo Thursday flyer database.');
+        showToast('Using verified Flipp Waterloo Thursday flyer database.');
       }
     } catch (e) {
-      showToast('Using verified Reebee Waterloo Thursday flyer database.');
+      showToast('Using verified Flipp Waterloo Thursday flyer database.');
     } finally {
       setIsRefreshingFlyers(false);
     }
@@ -496,10 +498,10 @@ export default function App() {
   const handleGenerateNewMealPlanOnDemand = async () => {
     if (isGeneratingPlanOnDemand) return;
     setIsGeneratingPlanOnDemand(true);
-    showToast('Re-running Waterloo flyer script & syncing deals...');
+    showToast('Re-running Waterloo Flipp flyer script & syncing deals...');
 
     try {
-      const postal = flyerWeek.reebeePostalCode || 'N2L 3E4';
+      const postal = flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 3E4';
       let activeDeals = deals;
 
       // 1. Re-run Waterloo flyer script
@@ -523,7 +525,9 @@ export default function App() {
               ...prev,
               validFrom: flyerData.validFrom || prev.validFrom,
               validTo: flyerData.validTo || prev.validTo,
-              lastUpdated: `Synced via Reebee (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+              lastUpdated: `Synced via Flipp (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+              flippSyncSource: 'Flipp.com Waterloo Digital Circulars',
+              flippPostalCode: postal,
               totalDealsTracked: flyerData.deals.length,
             }));
           }

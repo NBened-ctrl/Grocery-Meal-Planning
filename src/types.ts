@@ -23,8 +23,10 @@ export interface FlyerDeal {
   suggestedProtein?: string;
   suggestedVeg?: string;
   suggestedStarch?: string;
-  reebeeVerified?: boolean; // Verified against Reebee Waterloo flyers
-  reebeeUrl?: string; // Direct link or search query URL to Reebee digital flyer
+  flippVerified?: boolean; // Verified against Flipp Waterloo flyers
+  flippUrl?: string; // Direct link or search query URL to Flipp digital flyer
+  reebeeVerified?: boolean; // Backwards compatible alias
+  reebeeUrl?: string;
   postalCode?: string; // Waterloo postal code e.g. "N2L 3E4"
 }
 
@@ -146,7 +148,9 @@ export interface FlyerWeekInfo {
   validTo: string;   // e.g., "Wednesday, Aug 26"
   location: string;  // "Waterloo, ON"
   lastUpdated: string;
-  reebeeSyncSource?: string; // e.g. "Reebee Digital Circulars (Waterloo, ON)"
-  reebeePostalCode?: string; // e.g. "N2L 3E4"
+  flippSyncSource?: string; // e.g. "Flipp Digital Circulars (Waterloo, ON)"
+  flippPostalCode?: string; // e.g. "N2L 3E4"
+  reebeeSyncSource?: string; // Backwards compatible alias
+  reebeePostalCode?: string;
   totalDealsTracked?: number;
 }
