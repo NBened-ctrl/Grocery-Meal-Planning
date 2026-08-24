@@ -218,21 +218,35 @@ export const SwapMealModal: React.FC<SwapMealModalProps> = ({
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to generate swap recipe');
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.warn('Non-JSON response from /api/swap-meal:', text.slice(0, 100));
       }
 
-      const data = await res.json();
-      if (data.title && data.components) {
+      if (data && data.title && data.components) {
         onApplySwap(data);
         onClose();
+      } else if (!res.ok) {
+        throw new Error((data && data.error) || 'Failed to generate swap recipe from server');
       } else {
-        throw new Error('Invalid recipe structure returned.');
+        // Use first alternative template as fallback
+        const fallback = alternativeTemplates[0];
+        onApplySwap(fallback);
+        onClose();
       }
     } catch (err: any) {
       console.error('Swap error:', err);
-      setErrorMsg(err.message || 'Failed to generate replacement recipe.');
+      // Automatically fallback to alternative template if network/server is interrupted
+      if (alternativeTemplates.length > 0) {
+        onApplySwap(alternativeTemplates[0]);
+        onClose();
+      } else {
+        setErrorMsg(err.message || 'Failed to generate replacement recipe.');
+      }
     } finally {
       setIsAiLoading(false);
     }

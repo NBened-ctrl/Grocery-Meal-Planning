@@ -122,13 +122,14 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.results && Array.isArray(data.results)) {
-          setLiveSearchResults(data.results);
-        } else {
-          setLiveSearchResults([]);
-        }
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      }
+
+      if (data && data.results && Array.isArray(data.results)) {
+        setLiveSearchResults(data.results);
       } else {
         // Fallback filter locally
         const q = liveSearchQuery.toLowerCase();

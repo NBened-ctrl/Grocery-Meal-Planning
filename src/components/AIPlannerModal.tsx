@@ -60,17 +60,26 @@ export const AIPlannerModal: React.FC<AIPlannerModalProps> = ({
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to generate AI meal plan');
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.warn('Non-JSON response from /api/generate-plan:', text.slice(0, 100));
       }
 
-      const data = await res.json();
-      if (data.meals && Array.isArray(data.meals)) {
-        onApplyGeneratedPlan(data.meals, data.weeklySummary, data.estimatedWeeklyCostCAD);
+      if (data && data.meals && Array.isArray(data.meals) && data.meals.length > 0) {
+        onApplyGeneratedPlan(
+          data.meals, 
+          data.weeklySummary || `Optimized 7-Day Waterloo Dinner Plan for ${selectedMonth}`, 
+          data.estimatedWeeklyCostCAD || 85.0
+        );
         onClose();
+      } else if (!res.ok) {
+        throw new Error((data && data.error) || 'Failed to generate meal plan from server');
       } else {
-        throw new Error('Invalid response structure received from AI.');
+        throw new Error('Could not parse meal plan structure.');
       }
     } catch (err: any) {
       console.error('AI Generation error:', err);

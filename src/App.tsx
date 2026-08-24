@@ -415,21 +415,25 @@ export default function App() {
           postalCode: postal,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.deals && Array.isArray(data.deals)) {
-          setDeals(data.deals);
-          setFlyerWeek((prev) => ({
-            ...prev,
-            validFrom: data.validFrom || prev.validFrom,
-            validTo: data.validTo || prev.validTo,
-            lastUpdated: `Synced via Reebee (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
-            reebeeSyncSource: 'Reebee Waterloo Digital Circulars',
-            reebeePostalCode: postal,
-            totalDealsTracked: data.deals.length,
-          }));
-          showToast(`Synced ${data.deals.length} verified Reebee deals for ${postal}!`);
-        }
+
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      }
+
+      if (data && data.deals && Array.isArray(data.deals) && data.deals.length > 0) {
+        setDeals(data.deals);
+        setFlyerWeek((prev) => ({
+          ...prev,
+          validFrom: data.validFrom || prev.validFrom,
+          validTo: data.validTo || prev.validTo,
+          lastUpdated: `Synced via Reebee (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+          reebeeSyncSource: 'Reebee Waterloo Digital Circulars',
+          reebeePostalCode: postal,
+          totalDealsTracked: data.deals.length,
+        }));
+        showToast(`Synced ${data.deals.length} verified Reebee deals for ${postal}!`);
       } else {
         showToast('Using verified Reebee Waterloo Thursday flyer database.');
       }
