@@ -476,14 +476,22 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                           </button>
 
                           <div className="min-w-0">
-                            <span
-                              className={`font-semibold text-xs sm:text-sm text-stone-100 block truncate ${
-                                item.checked ? 'line-through text-stone-400' : ''
-                              }`}
-                            >
-                              {item.name}
-                            </span>
-                            <div className="text-[11px] text-stone-400 font-normal flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`font-semibold text-xs sm:text-sm text-stone-100 block truncate ${
+                                  item.checked ? 'line-through text-stone-400' : ''
+                                }`}
+                              >
+                                {item.name}
+                              </span>
+                              {item.notes && item.notes.includes('Active Flyer') && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/90 text-emerald-300 text-[10px] font-semibold border border-emerald-800 shrink-0">
+                                  <Tag className="w-2.5 h-2.5" />
+                                  Flyer Sale
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-stone-400 font-normal flex items-center gap-2 flex-wrap mt-0.5">
                               <span>Qty: {item.quantity}</span>
                               <span>•</span>
                               <span className="text-stone-400">{item.category}</span>
@@ -493,6 +501,12 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                                   <span className="text-emerald-400 font-medium truncate max-w-[180px]">
                                     {item.forMeals.join(', ')}
                                   </span>
+                                </>
+                              )}
+                              {item.notes && !item.notes.includes('Active Flyer') && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-stone-400 italic text-[10px]">{item.notes}</span>
                                 </>
                               )}
                             </div>
@@ -588,14 +602,22 @@ export const GroceryListView: React.FC<GroceryListViewProps> = ({
                           </button>
 
                           <div className="min-w-0">
-                            <span
-                              className={`font-semibold text-xs sm:text-sm text-stone-100 block truncate ${
-                                item.checked ? 'line-through text-stone-400' : ''
-                              }`}
-                            >
-                              {item.name}
-                            </span>
-                            <div className="text-[11px] text-stone-400 font-normal flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`font-semibold text-xs sm:text-sm text-stone-100 block truncate ${
+                                  item.checked ? 'line-through text-stone-400' : ''
+                                }`}
+                              >
+                                {item.name}
+                              </span>
+                              {item.notes && item.notes.includes('Active Flyer') && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/90 text-emerald-300 text-[10px] font-semibold border border-emerald-800 shrink-0">
+                                  <Tag className="w-2.5 h-2.5" />
+                                  Flyer Sale
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-stone-400 font-normal flex items-center gap-2 flex-wrap mt-0.5">
                               <span>Qty: {item.quantity}</span>
                               <span>•</span>
                               <span className="text-emerald-400 font-medium">Buy at {item.store}</span>

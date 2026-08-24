@@ -155,7 +155,36 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Compile Grocery List from active Meals + Custom items
+  // Helper function to find a matching active flyer deal for an ingredient
+  const findMatchingFlyerDeal = (ingredientName: string): FlyerDeal | undefined => {
+    if (!ingredientName || !deals || deals.length === 0) return undefined;
+    const cleanIng = ingredientName.toLowerCase().trim();
+    
+    // 1. Direct name substring check
+    const directMatch = deals.find((d) => {
+      const dealName = d.name.toLowerCase();
+      const p = d.suggestedProtein?.toLowerCase() || '';
+      const v = d.suggestedVeg?.toLowerCase() || '';
+      const s = d.suggestedStarch?.toLowerCase() || '';
+      return cleanIng.includes(dealName) || dealName.includes(cleanIng) ||
+             (p && cleanIng.includes(p)) ||
+             (v && cleanIng.includes(v)) ||
+             (s && cleanIng.includes(s));
+    });
+    if (directMatch) return directMatch;
+
+    // 2. Keyword matching for common Waterloo flyer loss leaders
+    const keywords = ['chicken', 'beef', 'pork', 'salmon', 'shrimp', 'corn', 'broccoli', 'beans', 'tomatoes', 'potatoes', 'rice', 'pasta', 'peppers', 'steak', 'mushrooms', 'cucumbers', 'apples'];
+    for (const kw of keywords) {
+      if (cleanIng.includes(kw)) {
+        const match = deals.find((d) => d.name.toLowerCase().includes(kw));
+        if (match) return match;
+      }
+    }
+    return undefined;
+  };
+
+  // Compile Grocery List from active Meals + Custom items (strictly prioritizing active flyer sales)
   const compiledGroceryList: GroceryItem[] = React.useMemo(() => {
     const itemMap = new Map<string, GroceryItem>();
 
@@ -174,23 +203,41 @@ export default function App() {
           }
         }
 
+        // Cross-match with active flyer deals
+        const activeDeal = findMatchingFlyerDeal(ing.name);
+
         const storeKey = (familySettings.primaryStore !== 'Multi-Store Optimizer' 
           ? familySettings.primaryStore 
-          : ing.store) || 'Food Basics';
+          : (activeDeal?.store || ing.store)) || 'Food Basics';
         const key = `${ing.name.toLowerCase()}-${storeKey}`;
+
+        // Price calculation: use ingredient price or derive proportionally from active flyer sale
+        const itemSalePrice = ing.estimatedPrice !== undefined 
+          ? ing.estimatedPrice 
+          : (activeDeal ? activeDeal.salePrice : undefined);
+        const itemRegPrice = activeDeal 
+          ? activeDeal.regularPrice 
+          : (itemSalePrice ? itemSalePrice * 1.35 : undefined);
+
+        const dealNote = activeDeal 
+          ? `Active Flyer Deal: ${activeDeal.discountLabel || activeDeal.name} at ${activeDeal.store} ($${activeDeal.salePrice.toFixed(2)} ${activeDeal.unit})`
+          : ing.notes;
 
         if (itemMap.has(key)) {
           const existing = itemMap.get(key)!;
           if (!existing.forMeals.includes(`${meal.dayOfWeek} Dinner`)) {
             existing.forMeals.push(`${meal.dayOfWeek} Dinner`);
           }
-          if (ing.estimatedPrice) {
-            existing.salePrice = (existing.salePrice || 0) + ing.estimatedPrice;
+          if (itemSalePrice) {
+            existing.salePrice = (existing.salePrice || 0) + itemSalePrice;
+          }
+          if (itemRegPrice) {
+            existing.regularPrice = (existing.regularPrice || 0) + itemRegPrice;
           }
         } else {
-          let category: any = 'Fresh Produce';
+          let category: any = activeDeal?.category || 'Fresh Produce';
           const nameLower = ing.name.toLowerCase();
-          if (nameLower.includes('chicken') || nameLower.includes('beef') || nameLower.includes('pork') || nameLower.includes('steak')) {
+          if (nameLower.includes('chicken') || nameLower.includes('beef') || nameLower.includes('pork') || nameLower.includes('steak') || nameLower.includes('turkey')) {
             category = 'Meat & Poultry';
           } else if (nameLower.includes('salmon') || nameLower.includes('shrimp') || nameLower.includes('haddock') || nameLower.includes('fish') || nameLower.includes('cod')) {
             category = 'Seafood';
@@ -208,11 +255,11 @@ export default function App() {
             quantity: ing.amount,
             store: storeKey,
             category: category,
-            salePrice: ing.estimatedPrice,
-            regularPrice: ing.estimatedPrice ? ing.estimatedPrice * 1.35 : undefined,
+            salePrice: itemSalePrice,
+            regularPrice: itemRegPrice,
             checked: Boolean(checkedItemIds[`item-${key}`]),
             forMeals: [`${meal.dayOfWeek} Dinner`],
-            notes: ing.notes,
+            notes: dealNote,
           });
         }
       });
@@ -227,7 +274,7 @@ export default function App() {
     });
 
     return Array.from(itemMap.values());
-  }, [meals, pantryItems, familySettings.primaryStore, customGroceryItems, checkedItemIds]);
+  }, [meals, pantryItems, familySettings.primaryStore, customGroceryItems, checkedItemIds, deals]);
 
   const totalWeeklyCost = compiledGroceryList
     .filter((i) => i.store !== 'Pantry (On Hand)')

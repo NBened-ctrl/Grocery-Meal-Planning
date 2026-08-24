@@ -825,19 +825,43 @@ app.post('/api/generate-plan', async (req, res) => {
         }
       });
 
-      const systemPrompt = `You are a culinary director and family meal planner for Kitchener-Waterloo, Ontario.
-Generate an inspiring 7-day dinner plan (Monday-Sunday) for a family of ${totalPeople} (${adults} adults, ${kids} kids).
-Rules:
-1. Every dinner MUST follow the 3-PILLAR formula: Exactly 1 protein + 1 or 2 vegetables + exactly 1 starch or grain.
-2. Scale portions, servings (${totalPeople}), and ingredients accurately for ${adults} adults and ${kids} children.
-3. ${isOnePotPrioritized ? 'CRITICAL: Must be ONE-POT, ONE-PAN, or SHEET-PAN meals with fast cleanup.' : 'Include convenient sheet-pan and skillet meals.'}
-4. ${excludedMeals.length > 0 ? `DO NOT USE ANY OF THESE 0-1 STAR BLACKLISTED DISHES: [${excludedMeals.join(', ')}].` : ''}
-5. ${stapleMeals.length > 0 ? `The family loves these 4-5 star staple ideas: [${stapleMeals.map(s => s.title).join(', ')}].` : ''}
-6. Target month: ${currentMonth} in Ontario. Prioritize Waterloo flyer deals from Food Basics, Superstore, Zehrs, and Sobeys.`;
+      const systemPrompt = `You are the Master Culinary Director and Family Meal Planner for Kitchener-Waterloo, Ontario.
+Generate an inspiring, delicious 7-day dinner plan (Monday-Sunday) for a family of ${totalPeople} (${adults} adults, ${kids} kids).
 
-      const userPrompt = `Incorporate current Waterloo flyer deals:
-${JSON.stringify((currentDeals || []).slice(0, 12), null, 2)}
-Custom instructions: ${customPrompt || 'Nutritious kid-friendly meals under 35 mins'}.`;
+CRITICAL ACTIVE FLYER & SALE PRICING DIRECTIVE:
+1. When selecting ingredients and pricing every meal and grocery item, YOU MUST ONLY CONSIDER CURRENT ACTIVE FLYERS AND SALES for the supported Kitchener-Waterloo grocery stores (Food Basics, Real Canadian Superstore, Zehrs, and Sobeys).
+2. Every dinner MUST follow the 3-PILLAR formula: Exactly 1 protein + 1 or 2 vegetables + exactly 1 starch or grain.
+3. Every dinner's main protein, vegetables, and starch/grain MUST be directly sourced from items currently on active flyer sale in the provided deals list.
+4. For every ingredient in the 'ingredients' array:
+   - Provide the specific 'store' offering the active flyer sale (e.g., 'Food Basics', 'Real Canadian Superstore', 'Zehrs', 'Sobeys').
+   - Calculate 'estimatedPrice' strictly based on the active flyer sale price (pro-rated accurately for the family portion size).
+   - Set 'isPantryStaple' to true ONLY for basic kitchen staples (cooking oil, salt, black pepper, dry spices).
+5. Calculate 'estimatedCostTotal' and 'costPerServing' strictly by summing the active flyer sale prices.
+6. Scale portions and ingredients accurately for ${adults} adults and ${kids} children (total ${totalPeople} eaters).
+7. ${isOnePotPrioritized ? 'CRITICAL: Must be ONE-POT, ONE-PAN, or SHEET-PAN meals with fast cleanup.' : 'Include convenient sheet-pan and skillet meals.'}
+8. ${excludedMeals.length > 0 ? `DO NOT USE ANY OF THESE 0-1 STAR BLACKLISTED DISHES: [${excludedMeals.join(', ')}].` : ''}
+9. ${stapleMeals.length > 0 ? `The family loves these 4-5 star staple ideas: [${stapleMeals.map(s => s.title).join(', ')}].` : ''}
+10. In 'dealsUsed', list the exact active flyer deals utilized for that dinner (e.g. 'Food Basics Chicken Thighs ($1.99/lb)', 'Zehrs Green Beans ($1.99/lb)').`;
+
+      const activeFlyerDeals = (currentDeals && currentDeals.length > 0) ? currentDeals : FALLBACK_WATERLOO_DEALS;
+      const formattedDeals = activeFlyerDeals.map((d: any) => ({
+        store: d.store,
+        name: d.name,
+        category: d.category,
+        salePriceCAD: d.salePrice,
+        regularPriceCAD: d.regularPrice,
+        unit: d.unit,
+        discount: d.discountLabel,
+        suggestedProtein: d.suggestedProtein,
+        suggestedVeg: d.suggestedVeg,
+        suggestedStarch: d.suggestedStarch,
+      }));
+
+      const userPrompt = `Generate a 7-day family dinner plan based ONLY on these CURRENT ACTIVE FLYERS AND SALES in Waterloo:
+${JSON.stringify(formattedDeals, null, 2)}
+
+Target Month: ${currentMonth} (Ontario seasonal produce).
+Special Family Instructions: ${customPrompt || 'Healthy, kid-friendly dinners under 35 minutes maximizing weekly flyer savings'}.`;
 
       // Generate plan using multi-model resilience with timeout failover
       const responseText = await generateContentWithFallback(
@@ -1006,16 +1030,36 @@ app.post('/api/swap-meal', async (req, res) => {
       const isOnePot = Boolean(preferOnePotPan ?? familySettings?.preferOnePotPan);
       const totalPeople = (familySettings?.adultsCount ?? 2) + (familySettings?.kidsCount ?? 2);
 
-      const prompt = `Create an alternative dinner recipe for ${targetDay || 'Tonight'} for a family of ${totalPeople} in Waterloo, Ontario for ${monthStr}.
-Must follow 3-pillar formula (1 protein, 1-2 veg, 1 starch).
-${isOnePot ? 'Must be ONE-POT or SHEET-PAN meal.' : ''}
-Requested style/protein: ${requestedProteinOrTheme || 'Any top flyer deal'}.`;
+      const activeFlyerDeals = (currentDeals && currentDeals.length > 0) ? currentDeals : FALLBACK_WATERLOO_DEALS;
+      const formattedDeals = activeFlyerDeals.map((d: any) => ({
+        store: d.store,
+        name: d.name,
+        category: d.category,
+        salePriceCAD: d.salePrice,
+        regularPriceCAD: d.regularPrice,
+        unit: d.unit,
+        discount: d.discountLabel,
+      }));
+
+      const systemPrompt = `You are a Waterloo, ON culinary meal planner.
+Create a swap dinner recipe for ${targetDay || 'Tonight'} for a family of ${totalPeople} (${familySettings?.adultsCount ?? 2} adults, ${familySettings?.kidsCount ?? 2} kids) in Waterloo.
+
+CRITICAL DIRECTIVE: ONLY CONSIDER CURRENT ACTIVE FLYERS AND SALES from Food Basics, Real Canadian Superstore, Zehrs, and Sobeys.
+1. Must follow 3-pillar formula: Exactly 1 protein + 1 or 2 vegetables + 1 starch/grain.
+2. The main protein and vegetables MUST be actively on sale in the provided flyer deals list below.
+3. Compute ingredient prices strictly from the active flyer sale prices.
+4. ${isOnePot ? 'Must be ONE-POT or SHEET-PAN meal with rapid cleanup.' : ''}
+5. Style requested: ${requestedProteinOrTheme || 'Best active Waterloo flyer special'}.`;
+
+      const prompt = `Select from these ACTIVE FLYER DEALS in Waterloo:
+${JSON.stringify(formattedDeals, null, 2)}`;
 
       const responseText = await generateContentWithFallback(
         ai,
         {
           contents: prompt,
           config: {
+            systemInstruction: systemPrompt,
             responseMimeType: 'application/json',
             responseSchema: {
               type: Type.OBJECT,
