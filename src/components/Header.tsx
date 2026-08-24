@@ -18,7 +18,9 @@ import {
   Check,
   Users,
   Plus,
-  Minus
+  Minus,
+  RotateCw,
+  Loader2
 } from 'lucide-react';
 import { FlyerWeekInfo, KWStore, FamilySettings } from '../types';
 import { getSeasonalInfo } from '../data/seasonalData';
@@ -34,6 +36,8 @@ interface HeaderProps {
   familySettings?: FamilySettings;
   onMonthChange?: (month: string) => void;
   onUpdateFamilyMembers?: (adults: number, kids: number) => void;
+  onGenerateNewMealPlan?: () => void;
+  isGeneratingPlan?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
   openAIModal,
   familySettings,
   onUpdateFamilyMembers,
+  onGenerateNewMealPlan,
+  isGeneratingPlan = false,
 }) => {
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState<boolean>(false);
   const [showLocationMenu, setShowLocationMenu] = useState<boolean>(false);
@@ -150,6 +156,27 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Right Tools & Expand Header Button */}
             <div className="flex items-center gap-1.5 shrink-0">
+              {onGenerateNewMealPlan && (
+                <button
+                  id="btn-compact-new-meal-plan"
+                  onClick={onGenerateNewMealPlan}
+                  disabled={isGeneratingPlan}
+                  title="Re-run Waterloo flyer script & produce a new 7-day meal plan and grocery list"
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer ${
+                    isGeneratingPlan
+                      ? 'bg-amber-600/70 text-stone-900 cursor-not-allowed opacity-80'
+                      : 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-bold active:scale-95'
+                  }`}
+                >
+                  {isGeneratingPlan ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-950" />
+                  ) : (
+                    <RotateCw className="w-3.5 h-3.5 text-stone-950" />
+                  )}
+                  <span>{isGeneratingPlan ? 'Syncing...' : 'New Meal Plan'}</span>
+                </button>
+              )}
+
               <button
                 onClick={openAIModal}
                 title="AI Meal & Budget Optimizer"
@@ -343,6 +370,33 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Right Action Tools */}
               <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
+                {/* On-Demand New Meal Plan Button */}
+                {onGenerateNewMealPlan && (
+                  <button
+                    id="btn-header-new-meal-plan"
+                    onClick={onGenerateNewMealPlan}
+                    disabled={isGeneratingPlan}
+                    title="Re-run Waterloo flyer script to sync latest deals & produce a fresh 7-day meal plan and grocery list"
+                    className={`inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer ${
+                      isGeneratingPlan
+                        ? 'bg-amber-600/70 text-stone-900 cursor-not-allowed opacity-80'
+                        : 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 shadow-amber-950/20 active:scale-95'
+                    }`}
+                  >
+                    {isGeneratingPlan ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-stone-950" />
+                    ) : (
+                      <RotateCw className="w-4 h-4 text-stone-950" />
+                    )}
+                    <span className="whitespace-nowrap">
+                      {isGeneratingPlan ? 'Re-running Flyers & Plan...' : 'New Meal Plan'}
+                    </span>
+                    <span className="hidden xl:inline text-[10px] uppercase font-extrabold tracking-wider bg-stone-950/15 px-1.5 py-0.5 rounded-md">
+                      On Demand
+                    </span>
+                  </button>
+                )}
+
                 {/* Season Context Selector Button */}
                 <button
                   onClick={() => setCurrentTab('preferences')}

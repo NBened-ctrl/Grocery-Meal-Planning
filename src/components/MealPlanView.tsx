@@ -32,7 +32,8 @@ import {
   CheckSquare,
   Square,
   Ban,
-  Package
+  Package,
+  Loader2
 } from 'lucide-react';
 import { MealRecipe, KWStore, FamilySettings, RecipeRating } from '../types';
 import { getSeasonalInfo } from '../data/seasonalData';
@@ -52,6 +53,8 @@ interface MealPlanViewProps {
   onRateRecipe: (meal: MealRecipe, rating: number) => void;
   onToggleCookForLeftovers: (mealId: string) => void;
   onUpdateFamilyMembers?: (adults: number, kids: number) => void;
+  onGenerateNewMealPlan?: () => void;
+  isGeneratingPlan?: boolean;
 }
 
 export const MealPlanView: React.FC<MealPlanViewProps> = ({
@@ -66,6 +69,8 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
   onRateRecipe,
   onToggleCookForLeftovers,
   onUpdateFamilyMembers,
+  onGenerateNewMealPlan,
+  isGeneratingPlan = false,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -268,7 +273,27 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
+                  {onGenerateNewMealPlan && (
+                    <button
+                      id="btn-plan-new-meal-plan"
+                      onClick={onGenerateNewMealPlan}
+                      disabled={isGeneratingPlan}
+                      title="Re-run Waterloo flyer script and generate a new 7-day meal plan and grocery list"
+                      className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer ${
+                        isGeneratingPlan
+                          ? 'bg-amber-600/70 text-stone-900 cursor-not-allowed opacity-80'
+                          : 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-bold active:scale-95'
+                      }`}
+                    >
+                      {isGeneratingPlan ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-950" />
+                      ) : (
+                        <RotateCw className="w-3.5 h-3.5 text-stone-950" />
+                      )}
+                      <span>{isGeneratingPlan ? 'Syncing...' : 'New Meal Plan'}</span>
+                    </button>
+                  )}
                   <button
                     id="btn-plan-view-grocery"
                     onClick={onGoToGroceryList}
@@ -283,7 +308,7 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md transition-colors cursor-pointer active:scale-95"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    <span>AI Re-Optimize</span>
+                    <span>AI Optimizer</span>
                   </button>
                 </div>
               </div>
@@ -422,6 +447,20 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-2">
+              {onGenerateNewMealPlan && (
+                <button
+                  id="btn-plan-collapsed-new-plan"
+                  onClick={onGenerateNewMealPlan}
+                  disabled={isGeneratingPlan}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    isGeneratingPlan
+                      ? 'bg-amber-600/70 text-stone-900 cursor-not-allowed'
+                      : 'bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold'
+                  }`}
+                >
+                  {isGeneratingPlan ? 'Syncing...' : 'New Meal Plan'}
+                </button>
+              )}
               <button
                 onClick={onGoToGroceryList}
                 className="px-3 py-1.5 bg-stone-800 hover:bg-stone-750 text-white text-xs font-semibold rounded-lg border border-stone-700 cursor-pointer"
@@ -432,7 +471,7 @@ export const MealPlanView: React.FC<MealPlanViewProps> = ({
                 onClick={openAIModal}
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg cursor-pointer"
               >
-                AI Re-Optimize
+                AI Optimizer
               </button>
             </div>
           </div>

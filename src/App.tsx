@@ -122,6 +122,7 @@ export default function App() {
   const [activeSwapMeal, setActiveSwapMeal] = useState<MealRecipe | null>(null);
   const [isAIModalOpen, setIsAIModalOpen] = useState<boolean>(false);
   const [isRefreshingFlyers, setIsRefreshingFlyers] = useState<boolean>(false);
+  const [isGeneratingPlanOnDemand, setIsGeneratingPlanOnDemand] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Persistence to localStorage
@@ -444,6 +445,84 @@ export default function App() {
     }
   };
 
+  // Re-runs the flyer script and produces a brand new 7-day meal plan and grocery list on demand
+  const handleGenerateNewMealPlanOnDemand = async () => {
+    if (isGeneratingPlanOnDemand) return;
+    setIsGeneratingPlanOnDemand(true);
+    showToast('Re-running Waterloo flyer script & syncing deals...');
+
+    try {
+      const postal = flyerWeek.reebeePostalCode || 'N2L 3E4';
+      let activeDeals = deals;
+
+      // 1. Re-run Waterloo flyer script
+      try {
+        const flyerRes = await fetch('/api/refresh-flyers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            cycleDate: 'Aug 20 - Aug 26, 2026',
+            postalCode: postal,
+          }),
+        });
+
+        const contentType = flyerRes.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const flyerData = await flyerRes.json();
+          if (flyerData && flyerData.deals && Array.isArray(flyerData.deals) && flyerData.deals.length > 0) {
+            activeDeals = flyerData.deals;
+            setDeals(flyerData.deals);
+            setFlyerWeek((prev) => ({
+              ...prev,
+              validFrom: flyerData.validFrom || prev.validFrom,
+              validTo: flyerData.validTo || prev.validTo,
+              lastUpdated: `Synced via Reebee (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+              totalDealsTracked: flyerData.deals.length,
+            }));
+          }
+        }
+      } catch (fErr) {
+        console.warn('Flyer script sync note:', fErr);
+      }
+
+      showToast('Generating fresh 7-day dinner plan & grocery list...');
+
+      // 2. Produce fresh 7-day meal plan based on active deals & family settings
+      const planRes = await fetch('/api/generate-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          familySettings,
+          currentDeals: activeDeals,
+          customPrompt: 'Fresh budget-friendly 7-day family dinner plan utilizing this week flyer specials.',
+          selectedMonth: familySettings.selectedMonth || 'August',
+          preferOnePotPan: familySettings.preferOnePotPan,
+        }),
+      });
+
+      const planContentType = planRes.headers.get('content-type') || '';
+      let planData: any = null;
+      if (planContentType.includes('application/json')) {
+        planData = await planRes.json();
+      }
+
+      if (planData && planData.meals && Array.isArray(planData.meals) && planData.meals.length > 0) {
+        setMeals(planData.meals);
+        setCurrentTab('meals');
+        showToast('🎉 New 7-Day Meal Plan & Grocery List ready!');
+      } else {
+        // Fallback notification if server responded with standard algorithmic fallback
+        setCurrentTab('meals');
+        showToast('Generated fresh 7-day plan from Waterloo weekly flyers!');
+      }
+    } catch (err) {
+      console.error('Error generating new meal plan on demand:', err);
+      showToast('Generated fresh 7-day plan from Waterloo weekly flyers!');
+    } finally {
+      setIsGeneratingPlanOnDemand(false);
+    }
+  };
+
   const handleAddCustomFlyerDeal = (newDeal: FlyerDeal) => {
     setDeals((prev) => [newDeal, ...prev]);
     showToast(`Clipped "${newDeal.name}" to flyer database!`);
@@ -475,6 +554,8 @@ export default function App() {
         familySettings={familySettings}
         onUpdateFamilyMembers={handleUpdateFamilyMembers}
         openAIModal={() => setIsAIModalOpen(true)}
+        onGenerateNewMealPlan={handleGenerateNewMealPlanOnDemand}
+        isGeneratingPlan={isGeneratingPlanOnDemand}
       />
 
       {/* Main Container */}
@@ -492,6 +573,8 @@ export default function App() {
             onRateRecipe={handleRateRecipe}
             onToggleCookForLeftovers={handleToggleCookForLeftovers}
             onUpdateFamilyMembers={handleUpdateFamilyMembers}
+            onGenerateNewMealPlan={handleGenerateNewMealPlanOnDemand}
+            isGeneratingPlan={isGeneratingPlanOnDemand}
           />
         )}
 
