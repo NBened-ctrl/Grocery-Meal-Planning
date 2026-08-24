@@ -1419,4 +1419,10 @@ async function startServer() {
   });
 }
 
-startServer();
+// Standalone server execution for local / Cloud Run containers
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export { app };
+export default app;
