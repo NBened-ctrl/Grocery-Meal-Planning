@@ -34,6 +34,58 @@ function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Prom
   ]);
 }
 
+// Helper sleep
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Multi-model resilient generator with automatic failover on 503/429/timeouts
+const VALID_GEMINI_MODELS = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+
+async function generateContentWithFallback(
+  ai: GoogleGenAI,
+  params: {
+    contents: any;
+    config: any;
+    timeoutMs?: number;
+  },
+  models = VALID_GEMINI_MODELS
+): Promise<string | null> {
+  const timeoutMs = params.timeoutMs || 16000;
+
+  for (const model of models) {
+    // Try up to 2 attempts for temporary 503 high demand
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const geminiPromise = ai.models.generateContent({
+          model: model,
+          contents: params.contents,
+          config: params.config,
+        });
+
+        const response = await withTimeout(
+          geminiPromise,
+          timeoutMs,
+          `Model ${model} request timed out`
+        );
+
+        if (response && response.text) {
+          return response.text;
+        }
+      } catch (err: any) {
+        const status = err?.status || err?.code || (err?.message?.includes('503') ? 503 : null);
+        if (status === 503 && attempt === 1) {
+          // Brief backoff before second attempt
+          await delay(600);
+          continue;
+        }
+        // If second attempt or other error, break to next model
+        break;
+      }
+    }
+  }
+
+  return null;
+}
+
 // Fallback Waterloo Reebee Deals Database
 const FALLBACK_WATERLOO_DEALS = [
   {
@@ -787,52 +839,64 @@ Rules:
 ${JSON.stringify((currentDeals || []).slice(0, 12), null, 2)}
 Custom instructions: ${customPrompt || 'Nutritious kid-friendly meals under 35 mins'}.`;
 
-      // Set a 22-second timeout on Gemini request to prevent client timeout / 504 errors
-      const geminiPromise = ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: userPrompt,
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              weeklySummary: { type: Type.STRING },
-              estimatedWeeklyCostCAD: { type: Type.NUMBER },
-              meals: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    dayOfWeek: { type: Type.STRING },
-                    title: { type: Type.STRING },
-                    theme: { type: Type.STRING },
-                    servings: { type: Type.NUMBER },
-                    prepTimeMinutes: { type: Type.NUMBER },
-                    cookTimeMinutes: { type: Type.NUMBER },
-                    estimatedCostTotal: { type: Type.NUMBER },
-                    costPerServing: { type: Type.NUMBER },
-                    isOnePotOrPan: { type: Type.BOOLEAN },
-                    cookingStyle: { type: Type.STRING },
-                    vesselUsed: { type: Type.STRING },
-                    seasonalNote: { type: Type.STRING },
-                    components: {
-                      type: Type.OBJECT,
-                      properties: {
-                        protein: {
-                          type: Type.OBJECT,
-                          properties: {
-                            name: { type: Type.STRING },
-                            amount: { type: Type.STRING },
-                            dealSource: { type: Type.STRING },
-                            onSaleStore: { type: Type.STRING },
+      // Generate plan using multi-model resilience with timeout failover
+      const responseText = await generateContentWithFallback(
+        ai,
+        {
+          contents: userPrompt,
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                weeklySummary: { type: Type.STRING },
+                estimatedWeeklyCostCAD: { type: Type.NUMBER },
+                meals: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      dayOfWeek: { type: Type.STRING },
+                      title: { type: Type.STRING },
+                      theme: { type: Type.STRING },
+                      servings: { type: Type.NUMBER },
+                      prepTimeMinutes: { type: Type.NUMBER },
+                      cookTimeMinutes: { type: Type.NUMBER },
+                      estimatedCostTotal: { type: Type.NUMBER },
+                      costPerServing: { type: Type.NUMBER },
+                      isOnePotOrPan: { type: Type.BOOLEAN },
+                      cookingStyle: { type: Type.STRING },
+                      vesselUsed: { type: Type.STRING },
+                      seasonalNote: { type: Type.STRING },
+                      components: {
+                        type: Type.OBJECT,
+                        properties: {
+                          protein: {
+                            type: Type.OBJECT,
+                            properties: {
+                              name: { type: Type.STRING },
+                              amount: { type: Type.STRING },
+                              dealSource: { type: Type.STRING },
+                              onSaleStore: { type: Type.STRING },
+                            },
+                            required: ['name', 'amount'],
                           },
-                          required: ['name', 'amount'],
-                        },
-                        vegetables: {
-                          type: Type.ARRAY,
-                          items: {
+                          vegetables: {
+                            type: Type.ARRAY,
+                            items: {
+                              type: Type.OBJECT,
+                              properties: {
+                                name: { type: Type.STRING },
+                                amount: { type: Type.STRING },
+                                dealSource: { type: Type.STRING },
+                                onSaleStore: { type: Type.STRING },
+                              },
+                              required: ['name', 'amount'],
+                            },
+                          },
+                          starchOrGrain: {
                             type: Type.OBJECT,
                             properties: {
                               name: { type: Type.STRING },
@@ -843,76 +907,67 @@ Custom instructions: ${customPrompt || 'Nutritious kid-friendly meals under 35 m
                             required: ['name', 'amount'],
                           },
                         },
-                        starchOrGrain: {
+                        required: ['protein', 'vegetables', 'starchOrGrain'],
+                      },
+                      ingredients: {
+                        type: Type.ARRAY,
+                        items: {
                           type: Type.OBJECT,
                           properties: {
                             name: { type: Type.STRING },
                             amount: { type: Type.STRING },
-                            dealSource: { type: Type.STRING },
-                            onSaleStore: { type: Type.STRING },
+                            isPantryStaple: { type: Type.BOOLEAN },
+                            store: { type: Type.STRING },
+                            estimatedPrice: { type: Type.NUMBER },
                           },
-                          required: ['name', 'amount'],
+                          required: ['name', 'amount', 'isPantryStaple'],
                         },
                       },
-                      required: ['protein', 'vegetables', 'starchOrGrain'],
-                    },
-                    ingredients: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          name: { type: Type.STRING },
-                          amount: { type: Type.STRING },
-                          isPantryStaple: { type: Type.BOOLEAN },
-                          store: { type: Type.STRING },
-                          estimatedPrice: { type: Type.NUMBER },
-                        },
-                        required: ['name', 'amount', 'isPantryStaple'],
+                      instructions: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
+                      },
+                      kidFriendlyTip: { type: Type.STRING },
+                      dealsUsed: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING },
                       },
                     },
-                    instructions: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                    },
-                    kidFriendlyTip: { type: Type.STRING },
-                    dealsUsed: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                    },
+                    required: [
+                      'id',
+                      'dayOfWeek',
+                      'title',
+                      'theme',
+                      'servings',
+                      'prepTimeMinutes',
+                      'cookTimeMinutes',
+                      'estimatedCostTotal',
+                      'costPerServing',
+                      'components',
+                      'ingredients',
+                      'instructions',
+                      'dealsUsed',
+                    ],
                   },
-                  required: [
-                    'id',
-                    'dayOfWeek',
-                    'title',
-                    'theme',
-                    'servings',
-                    'prepTimeMinutes',
-                    'cookTimeMinutes',
-                    'estimatedCostTotal',
-                    'costPerServing',
-                    'components',
-                    'ingredients',
-                    'instructions',
-                    'dealsUsed',
-                  ],
                 },
               },
+              required: ['weeklySummary', 'estimatedWeeklyCostCAD', 'meals'],
             },
-            required: ['weeklySummary', 'estimatedWeeklyCostCAD', 'meals'],
           },
+          timeoutMs: 18000,
         },
-      });
+        VALID_GEMINI_MODELS
+      );
 
-      const response = await withTimeout(geminiPromise, 22000, 'Gemini request timed out');
-      if (response && response.text) {
-        const parsed = JSON.parse(response.text);
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
         if (parsed && parsed.meals && Array.isArray(parsed.meals) && parsed.meals.length >= 7) {
           return res.json(parsed);
         }
       }
     }
   } catch (error: any) {
-    console.warn('Gemini meal plan generation notice (using algorithmic plan engine):', error.message || error);
+    console.warn('AI meal plan generation note (activating algorithmic engine):', error?.message || error);
   }
 
   // Seamless fallback to customized algorithmic meal planner
@@ -956,43 +1011,55 @@ Must follow 3-pillar formula (1 protein, 1-2 veg, 1 starch).
 ${isOnePot ? 'Must be ONE-POT or SHEET-PAN meal.' : ''}
 Requested style/protein: ${requestedProteinOrTheme || 'Any top flyer deal'}.`;
 
-      const geminiPromise = ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              dayOfWeek: { type: Type.STRING },
-              title: { type: Type.STRING },
-              theme: { type: Type.STRING },
-              servings: { type: Type.NUMBER },
-              prepTimeMinutes: { type: Type.NUMBER },
-              cookTimeMinutes: { type: Type.NUMBER },
-              estimatedCostTotal: { type: Type.NUMBER },
-              costPerServing: { type: Type.NUMBER },
-              isOnePotOrPan: { type: Type.BOOLEAN },
-              cookingStyle: { type: Type.STRING },
-              vesselUsed: { type: Type.STRING },
-              seasonalNote: { type: Type.STRING },
-              components: {
-                type: Type.OBJECT,
-                properties: {
-                  protein: {
-                    type: Type.OBJECT,
-                    properties: {
-                      name: { type: Type.STRING },
-                      amount: { type: Type.STRING },
-                      dealSource: { type: Type.STRING },
-                      onSaleStore: { type: Type.STRING },
+      const responseText = await generateContentWithFallback(
+        ai,
+        {
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                dayOfWeek: { type: Type.STRING },
+                title: { type: Type.STRING },
+                theme: { type: Type.STRING },
+                servings: { type: Type.NUMBER },
+                prepTimeMinutes: { type: Type.NUMBER },
+                cookTimeMinutes: { type: Type.NUMBER },
+                estimatedCostTotal: { type: Type.NUMBER },
+                costPerServing: { type: Type.NUMBER },
+                isOnePotOrPan: { type: Type.BOOLEAN },
+                cookingStyle: { type: Type.STRING },
+                vesselUsed: { type: Type.STRING },
+                seasonalNote: { type: Type.STRING },
+                components: {
+                  type: Type.OBJECT,
+                  properties: {
+                    protein: {
+                      type: Type.OBJECT,
+                      properties: {
+                        name: { type: Type.STRING },
+                        amount: { type: Type.STRING },
+                        dealSource: { type: Type.STRING },
+                        onSaleStore: { type: Type.STRING },
+                      },
+                      required: ['name', 'amount'],
                     },
-                    required: ['name', 'amount'],
-                  },
-                  vegetables: {
-                    type: Type.ARRAY,
-                    items: {
+                    vegetables: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          name: { type: Type.STRING },
+                          amount: { type: Type.STRING },
+                          dealSource: { type: Type.STRING },
+                          onSaleStore: { type: Type.STRING },
+                        },
+                        required: ['name', 'amount'],
+                      },
+                    },
+                    starchOrGrain: {
                       type: Type.OBJECT,
                       properties: {
                         name: { type: Type.STRING },
@@ -1003,72 +1070,63 @@ Requested style/protein: ${requestedProteinOrTheme || 'Any top flyer deal'}.`;
                       required: ['name', 'amount'],
                     },
                   },
-                  starchOrGrain: {
+                  required: ['protein', 'vegetables', 'starchOrGrain'],
+                },
+                ingredients: {
+                  type: Type.ARRAY,
+                  items: {
                     type: Type.OBJECT,
                     properties: {
                       name: { type: Type.STRING },
                       amount: { type: Type.STRING },
-                      dealSource: { type: Type.STRING },
-                      onSaleStore: { type: Type.STRING },
+                      isPantryStaple: { type: Type.BOOLEAN },
+                      store: { type: Type.STRING },
+                      estimatedPrice: { type: Type.NUMBER },
                     },
-                    required: ['name', 'amount'],
+                    required: ['name', 'amount', 'isPantryStaple'],
                   },
                 },
-                required: ['protein', 'vegetables', 'starchOrGrain'],
-              },
-              ingredients: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    amount: { type: Type.STRING },
-                    isPantryStaple: { type: Type.BOOLEAN },
-                    store: { type: Type.STRING },
-                    estimatedPrice: { type: Type.NUMBER },
-                  },
-                  required: ['name', 'amount', 'isPantryStaple'],
+                instructions: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                kidFriendlyTip: { type: Type.STRING },
+                dealsUsed: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
                 },
               },
-              instructions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              kidFriendlyTip: { type: Type.STRING },
-              dealsUsed: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
+              required: [
+                'id',
+                'dayOfWeek',
+                'title',
+                'theme',
+                'servings',
+                'prepTimeMinutes',
+                'cookTimeMinutes',
+                'estimatedCostTotal',
+                'costPerServing',
+                'components',
+                'ingredients',
+                'instructions',
+                'dealsUsed',
+              ],
             },
-            required: [
-              'id',
-              'dayOfWeek',
-              'title',
-              'theme',
-              'servings',
-              'prepTimeMinutes',
-              'cookTimeMinutes',
-              'estimatedCostTotal',
-              'costPerServing',
-              'components',
-              'ingredients',
-              'instructions',
-              'dealsUsed',
-            ],
           },
+          timeoutMs: 14000,
         },
-      });
+        VALID_GEMINI_MODELS
+      );
 
-      const response = await withTimeout(geminiPromise, 15000, 'Gemini swap timed out');
-      if (response && response.text) {
-        const parsed = JSON.parse(response.text);
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
         if (parsed && parsed.title && parsed.components) {
           return res.json(parsed);
         }
       }
     }
   } catch (error: any) {
-    console.warn('Gemini swap meal notice (using algorithmic swap):', error.message || error);
+    console.warn('AI swap meal note (using algorithmic swap):', error?.message || error);
   }
 
   // Fallback swap recipe
@@ -1148,58 +1206,61 @@ app.post('/api/refresh-flyers', async (req, res) => {
 Generate an authentic set of 16-20 weekly grocery flyer deals for the Thursday cycle (${cycleDate || 'August 20 - August 26, 2026'}).
 Include Food Basics, Real Canadian Superstore, Zehrs, and Sobeys in Waterloo with realistic salePrice, regularPrice, and unit.`;
 
-      const geminiPromise = ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              validFrom: { type: Type.STRING },
-              validTo: { type: Type.STRING },
-              syncSource: { type: Type.STRING },
-              deals: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    store: { type: Type.STRING },
-                    name: { type: Type.STRING },
-                    category: { type: Type.STRING },
-                    salePrice: { type: Type.NUMBER },
-                    regularPrice: { type: Type.NUMBER },
-                    unit: { type: Type.STRING },
-                    discountLabel: { type: Type.STRING },
-                    validUntil: { type: Type.STRING },
-                    isLossLeader: { type: Type.BOOLEAN },
-                    suggestedProtein: { type: Type.STRING },
-                    suggestedVeg: { type: Type.STRING },
-                    suggestedStarch: { type: Type.STRING },
-                    reebeeVerified: { type: Type.BOOLEAN },
-                    reebeeUrl: { type: Type.STRING },
-                    postalCode: { type: Type.STRING },
+      const responseText = await generateContentWithFallback(
+        ai,
+        {
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                validFrom: { type: Type.STRING },
+                validTo: { type: Type.STRING },
+                syncSource: { type: Type.STRING },
+                deals: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      store: { type: Type.STRING },
+                      name: { type: Type.STRING },
+                      category: { type: Type.STRING },
+                      salePrice: { type: Type.NUMBER },
+                      regularPrice: { type: Type.NUMBER },
+                      unit: { type: Type.STRING },
+                      discountLabel: { type: Type.STRING },
+                      validUntil: { type: Type.STRING },
+                      isLossLeader: { type: Type.BOOLEAN },
+                      suggestedProtein: { type: Type.STRING },
+                      suggestedVeg: { type: Type.STRING },
+                      suggestedStarch: { type: Type.STRING },
+                      reebeeVerified: { type: Type.BOOLEAN },
+                      reebeeUrl: { type: Type.STRING },
+                      postalCode: { type: Type.STRING },
+                    },
+                    required: ['id', 'store', 'name', 'category', 'salePrice', 'regularPrice', 'unit'],
                   },
-                  required: ['id', 'store', 'name', 'category', 'salePrice', 'regularPrice', 'unit'],
                 },
               },
+              required: ['deals', 'validFrom', 'validTo'],
             },
-            required: ['deals', 'validFrom', 'validTo'],
           },
+          timeoutMs: 14000,
         },
-      });
+        VALID_GEMINI_MODELS
+      );
 
-      const response = await withTimeout(geminiPromise, 12000, 'Flyer refresh timed out');
-      if (response && response.text) {
-        const parsed = JSON.parse(response.text);
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
         if (parsed && parsed.deals && Array.isArray(parsed.deals) && parsed.deals.length > 0) {
           return res.json(parsed);
         }
       }
     }
   } catch (error: any) {
-    console.warn('Flyer refresh notice (using verified Reebee database):', error.message || error);
+    console.warn('Flyer refresh note (using verified Reebee database):', error?.message || error);
   }
 
   // Fallback to verified Reebee deals
@@ -1224,53 +1285,56 @@ app.post('/api/reebee-search', async (req, res) => {
       const prompt = `Search Reebee digital flyers in Waterloo, ON (${postal}) for: "${q}".
 Return matching deals for Food Basics, Superstore, Zehrs, and Sobeys.`;
 
-      const geminiPromise = ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              query: { type: Type.STRING },
-              postalCode: { type: Type.STRING },
-              results: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    store: { type: Type.STRING },
-                    name: { type: Type.STRING },
-                    category: { type: Type.STRING },
-                    salePrice: { type: Type.NUMBER },
-                    regularPrice: { type: Type.NUMBER },
-                    unit: { type: Type.STRING },
-                    discountLabel: { type: Type.STRING },
-                    validUntil: { type: Type.STRING },
-                    isLossLeader: { type: Type.BOOLEAN },
-                    reebeeVerified: { type: Type.BOOLEAN },
-                    reebeeUrl: { type: Type.STRING },
+      const responseText = await generateContentWithFallback(
+        ai,
+        {
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                query: { type: Type.STRING },
+                postalCode: { type: Type.STRING },
+                results: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      store: { type: Type.STRING },
+                      name: { type: Type.STRING },
+                      category: { type: Type.STRING },
+                      salePrice: { type: Type.NUMBER },
+                      regularPrice: { type: Type.NUMBER },
+                      unit: { type: Type.STRING },
+                      discountLabel: { type: Type.STRING },
+                      validUntil: { type: Type.STRING },
+                      isLossLeader: { type: Type.BOOLEAN },
+                      reebeeVerified: { type: Type.BOOLEAN },
+                      reebeeUrl: { type: Type.STRING },
+                    },
+                    required: ['id', 'store', 'name', 'category', 'salePrice', 'regularPrice', 'unit'],
                   },
-                  required: ['id', 'store', 'name', 'category', 'salePrice', 'regularPrice', 'unit'],
                 },
               },
+              required: ['query', 'results'],
             },
-            required: ['query', 'results'],
           },
+          timeoutMs: 10000,
         },
-      });
+        VALID_GEMINI_MODELS
+      );
 
-      const response = await withTimeout(geminiPromise, 10000, 'Reebee search timed out');
-      if (response && response.text) {
-        const parsed = JSON.parse(response.text);
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
         if (parsed && parsed.results) {
           return res.json(parsed);
         }
       }
     }
   } catch (error: any) {
-    console.warn('Reebee search notice (using local search):', error.message || error);
+    console.warn('Reebee search note (using local search):', error?.message || error);
   }
 
   // Filter local Waterloo deals database
