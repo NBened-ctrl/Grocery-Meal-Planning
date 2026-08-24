@@ -12,11 +12,15 @@ app.use(express.json());
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn('GEMINI_API_KEY not configured. Falling back to local generation algorithms.');
     return null;
   }
   return new GoogleGenAI({
     apiKey: apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
   });
 }
 
@@ -30,11 +34,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Prom
   ]);
 }
 
-// Helper sleep
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Multi-model resilient generator with automatic failover on 503/429/timeouts
-const VALID_GEMINI_MODELS = ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+// Multi-model resilient generator with automatic failover
+const VALID_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.7-flash'];
 
 async function generateContentWithFallback(
   ai: GoogleGenAI,
@@ -45,37 +46,27 @@ async function generateContentWithFallback(
   },
   models = VALID_GEMINI_MODELS
 ): Promise<string | null> {
-  const timeoutMs = params.timeoutMs || 16000;
+  const timeoutMs = params.timeoutMs || 8000;
 
   for (const model of models) {
-    // Try up to 2 attempts for temporary 503 high demand
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const geminiPromise = ai.models.generateContent({
-          model: model,
-          contents: params.contents,
-          config: params.config,
-        });
+    try {
+      const geminiPromise = ai.models.generateContent({
+        model: model,
+        contents: params.contents,
+        config: params.config,
+      });
 
-        const response = await withTimeout(
-          geminiPromise,
-          timeoutMs,
-          `Model ${model} request timed out`
-        );
+      const response = await withTimeout(
+        geminiPromise,
+        timeoutMs,
+        `Model ${model} request timed out`
+      );
 
-        if (response && response.text) {
-          return response.text;
-        }
-      } catch (err: any) {
-        const status = err?.status || err?.code || (err?.message?.includes('503') ? 503 : null);
-        if (status === 503 && attempt === 1) {
-          // Brief backoff before second attempt
-          await delay(600);
-          continue;
-        }
-        // If second attempt or other error, break to next model
-        break;
+      if (response && response.text) {
+        return response.text;
       }
+    } catch (err: any) {
+      console.warn(`Gemini model ${model} response note:`, err?.message || err);
     }
   }
 

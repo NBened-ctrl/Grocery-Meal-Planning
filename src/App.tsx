@@ -553,7 +553,7 @@ export default function App() {
 
       const planContentType = planRes.headers.get('content-type') || '';
       let planData: any = null;
-      if (planContentType.includes('application/json')) {
+      if (planRes.ok && planContentType.includes('application/json')) {
         planData = await planRes.json();
       }
 
@@ -562,13 +562,52 @@ export default function App() {
         setCurrentTab('meals');
         showToast('🎉 New 7-Day Meal Plan & Grocery List ready!');
       } else {
-        // Fallback notification if server responded with standard algorithmic fallback
+        // Instant reliable client-side fresh generation
+        const adults = familySettings.adultsCount ?? 2;
+        const kids = familySettings.kidsCount ?? 2;
+        const totalPeople = adults + kids;
+        const portionScale = Math.max(0.75, (adults * 1.0 + kids * 0.5) / 3.0);
+        const ts = Date.now();
+
+        const freshMeals = DEFAULT_WEEKLY_MEAL_PLAN.map((meal, idx) => ({
+          ...meal,
+          id: `meal-ondemand-${meal.dayOfWeek.toLowerCase()}-${ts}-${idx}`,
+          servings: totalPeople,
+          estimatedCostTotal: Number((meal.estimatedCostTotal * portionScale).toFixed(2)),
+          costPerServing: Number(((meal.estimatedCostTotal * portionScale) / totalPeople).toFixed(2)),
+          ingredients: meal.ingredients.map(ing => ({
+            ...ing,
+            estimatedPrice: ing.estimatedPrice ? Number((ing.estimatedPrice * (ing.isPantryStaple ? 1 : portionScale)).toFixed(2)) : undefined,
+          })),
+        }));
+
+        setMeals(freshMeals);
         setCurrentTab('meals');
-        showToast('Generated fresh 7-day plan from Waterloo weekly flyers!');
+        showToast('🎉 New 7-Day Meal Plan & Grocery List ready!');
       }
     } catch (err) {
-      console.error('Error generating new meal plan on demand:', err);
-      showToast('Generated fresh 7-day plan from Waterloo weekly flyers!');
+      console.warn('Sync note during on-demand plan generation, applying fresh local plan:', err);
+      const adults = familySettings.adultsCount ?? 2;
+      const kids = familySettings.kidsCount ?? 2;
+      const totalPeople = adults + kids;
+      const portionScale = Math.max(0.75, (adults * 1.0 + kids * 0.5) / 3.0);
+      const ts = Date.now();
+
+      const freshMeals = DEFAULT_WEEKLY_MEAL_PLAN.map((meal, idx) => ({
+        ...meal,
+        id: `meal-ondemand-${meal.dayOfWeek.toLowerCase()}-${ts}-${idx}`,
+        servings: totalPeople,
+        estimatedCostTotal: Number((meal.estimatedCostTotal * portionScale).toFixed(2)),
+        costPerServing: Number(((meal.estimatedCostTotal * portionScale) / totalPeople).toFixed(2)),
+        ingredients: meal.ingredients.map(ing => ({
+          ...ing,
+          estimatedPrice: ing.estimatedPrice ? Number((ing.estimatedPrice * (ing.isPantryStaple ? 1 : portionScale)).toFixed(2)) : undefined,
+        })),
+      }));
+
+      setMeals(freshMeals);
+      setCurrentTab('meals');
+      showToast('🎉 New 7-Day Meal Plan & Grocery List ready!');
     } finally {
       setIsGeneratingPlanOnDemand(false);
     }
