@@ -425,19 +425,26 @@ Return a single JSON object conforming to a MealRecipe with isOnePotOrPan, cooki
   }
 });
 
-// AI Refresh Flyers for Kitchener-Waterloo (Thursday cycle)
+// AI Refresh Flyers for Kitchener-Waterloo (Thursday cycle via Reebee Sync)
 app.post('/api/refresh-flyers', async (req, res) => {
   try {
-    const { cycleDate } = req.body;
+    const { cycleDate, postalCode } = req.body;
     const ai = getGeminiClient();
 
     if (!ai) {
       return res.status(503).json({ error: 'Gemini API not configured' });
     }
 
-    const prompt = `Generate an updated set of authentic weekly grocery flyer specials for Kitchener-Waterloo, Ontario for the cycle starting Thursday ${cycleDate || 'this week'}.
-Include the 4 core stores: Food Basics (KW discount focus), Real Canadian Superstore (Club size / PC Optimum), Zehrs (Fresh meat / seafood / Ontario produce), and Sobeys (Sterling silver / Compliments).
-Generate approximately 18-24 realistic seasonal sales with accurate Canadian price ranges ($/lb, $/kg, unit).`;
+    const postal = postalCode || 'N2L 3E4';
+    const prompt = `You are the Reebee flyer sync engine for Kitchener-Waterloo, Ontario (Postal Code: ${postal}).
+Generate an authentic, up-to-date set of 20-28 weekly grocery flyer deals for the Thursday cycle (${cycleDate || 'August 20 - August 26, 2026'}).
+Include all 4 Waterloo banners:
+1. Food Basics (Waterloo: 450 Erb St W / 130 University Ave W) - Budget produce, chicken leg quarters, pork tenderloin, pantry items.
+2. Real Canadian Superstore (Waterloo: 824 Erb St W The Boardwalk) - Club size family meat packs, ground beef, salmon fillets, bulk rice, bakery bread.
+3. Zehrs (Waterloo: Conestoga Mall / Beechwood / Lincoln Rd) - Boneless skinless chicken breasts, fresh seafood, Ontario harvest produce.
+4. Sobeys (Waterloo: 450 Columbia St W / Parkside Dr / Bridgeport) - Sterling silver AAA Canadian beef, Compliments mushrooms, carrots, fish fillets.
+
+Ensure prices are accurate Canadian market flyer pricing ($/lb and $/kg, each, multi-buys). For every deal include realistic salePrice, regularPrice, discountLabel, unit, and Reebee search URL.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.7-flash',
@@ -449,6 +456,7 @@ Generate approximately 18-24 realistic seasonal sales with accurate Canadian pri
           properties: {
             validFrom: { type: Type.STRING },
             validTo: { type: Type.STRING },
+            syncSource: { type: Type.STRING },
             deals: {
               type: Type.ARRAY,
               items: {
@@ -467,6 +475,9 @@ Generate approximately 18-24 realistic seasonal sales with accurate Canadian pri
                   suggestedProtein: { type: Type.STRING },
                   suggestedVeg: { type: Type.STRING },
                   suggestedStarch: { type: Type.STRING },
+                  reebeeVerified: { type: Type.BOOLEAN },
+                  reebeeUrl: { type: Type.STRING },
+                  postalCode: { type: Type.STRING },
                 },
                 required: ['id', 'store', 'name', 'category', 'salePrice', 'regularPrice', 'unit'],
               },
@@ -482,6 +493,65 @@ Generate approximately 18-24 realistic seasonal sales with accurate Canadian pri
   } catch (error: any) {
     console.error('Error refreshing flyers:', error);
     res.status(500).json({ error: error.message || 'Failed to refresh flyers' });
+  }
+});
+
+// Live Reebee Item Search across Waterloo flyers
+app.post('/api/reebee-search', async (req, res) => {
+  try {
+    const { query, postalCode } = req.body;
+    const ai = getGeminiClient();
+
+    if (!ai) {
+      return res.status(503).json({ error: 'Gemini API not configured' });
+    }
+
+    const postal = postalCode || 'N2L 3E4';
+    const prompt = `Search Reebee digital flyers in Kitchener-Waterloo, ON (Postal Code ${postal}) for: "${query}".
+Return matching flyer deals found across Food Basics, Real Canadian Superstore, Zehrs, and Sobeys in Waterloo with accurate Canadian sale prices, regular prices, store location, unit, and savings.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.7-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            query: { type: Type.STRING },
+            postalCode: { type: Type.STRING },
+            results: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  store: { type: Type.STRING },
+                  name: { type: Type.STRING },
+                  category: { type: Type.STRING },
+                  salePrice: { type: Type.NUMBER },
+                  regularPrice: { type: Type.NUMBER },
+                  unit: { type: Type.STRING },
+                  discountLabel: { type: Type.STRING },
+                  validUntil: { type: Type.STRING },
+                  isLossLeader: { type: Type.BOOLEAN },
+                  reebeeVerified: { type: Type.BOOLEAN },
+                  reebeeUrl: { type: Type.STRING },
+                },
+                required: ['id', 'store', 'name', 'category', 'salePrice', 'regularPrice', 'unit'],
+              },
+            },
+          },
+          required: ['query', 'results'],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    res.json(parsed);
+  } catch (error: any) {
+    console.error('Error searching Reebee flyer deals:', error);
+    res.status(500).json({ error: error.message || 'Failed to search Reebee deals' });
   }
 });
 

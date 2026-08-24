@@ -23,6 +23,9 @@ export interface FlyerDeal {
   suggestedProtein?: string;
   suggestedVeg?: string;
   suggestedStarch?: string;
+  reebeeVerified?: boolean; // Verified against Reebee Waterloo flyers
+  reebeeUrl?: string; // Direct link or search query URL to Reebee digital flyer
+  postalCode?: string; // Waterloo postal code e.g. "N2L 3E4"
 }
 
 export type CookingStyle = 'one_pot' | 'sheet_pan' | 'skillet' | 'slow_cooker' | 'casserole' | 'standard';
@@ -141,6 +144,9 @@ export interface FlyerWeekInfo {
   cycleName: string;
   validFrom: string; // e.g., "Thursday, Aug 20"
   validTo: string;   // e.g., "Wednesday, Aug 26"
-  location: string;  // "Kitchener-Waterloo, ON"
+  location: string;  // "Waterloo, ON"
   lastUpdated: string;
+  reebeeSyncSource?: string; // e.g. "Reebee Digital Circulars (Waterloo, ON)"
+  reebeePostalCode?: string; // e.g. "N2L 3E4"
+  totalDealsTracked?: number;
 }

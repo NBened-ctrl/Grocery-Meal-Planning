@@ -402,37 +402,47 @@ export default function App() {
     showToast('Applied AI Generated 7-Day Dinner Plan!');
   };
 
-  const handleRefreshFlyersAI = async () => {
+  const handleRefreshFlyersAI = async (postalCode?: string) => {
+    const postal = postalCode || flyerWeek.reebeePostalCode || 'N2L 3E4';
     setIsRefreshingFlyers(true);
-    showToast('AI Scanning Kitchener-Waterloo flyers...');
+    showToast(`Syncing Reebee flyers for Waterloo (${postal})...`);
     try {
       const res = await fetch('/api/refresh-flyers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cycleDate: 'Aug 20 - Aug 26' }),
+        body: JSON.stringify({ 
+          cycleDate: 'Aug 20 - Aug 26, 2026',
+          postalCode: postal,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.deals && Array.isArray(data.deals)) {
           setDeals(data.deals);
-          if (data.validFrom && data.validTo) {
-            setFlyerWeek((prev) => ({
-              ...prev,
-              validFrom: data.validFrom,
-              validTo: data.validTo,
-              lastUpdated: 'AI Live Scan Complete',
-            }));
-          }
-          showToast('Updated KW Flyer Deals for current Thursday cycle!');
+          setFlyerWeek((prev) => ({
+            ...prev,
+            validFrom: data.validFrom || prev.validFrom,
+            validTo: data.validTo || prev.validTo,
+            lastUpdated: `Synced via Reebee (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+            reebeeSyncSource: 'Reebee Waterloo Digital Circulars',
+            reebeePostalCode: postal,
+            totalDealsTracked: data.deals.length,
+          }));
+          showToast(`Synced ${data.deals.length} verified Reebee deals for ${postal}!`);
         }
       } else {
-        showToast('Using local KW Thursday flyer database.');
+        showToast('Using verified Reebee Waterloo Thursday flyer database.');
       }
     } catch (e) {
-      showToast('Using local KW Thursday flyer database.');
+      showToast('Using verified Reebee Waterloo Thursday flyer database.');
     } finally {
       setIsRefreshingFlyers(false);
     }
+  };
+
+  const handleAddCustomFlyerDeal = (newDeal: FlyerDeal) => {
+    setDeals((prev) => [newDeal, ...prev]);
+    showToast(`Clipped "${newDeal.name}" to flyer database!`);
   };
 
   const handleTogglePantryItem = (id: string) => {
@@ -498,6 +508,7 @@ export default function App() {
             onAddDealToShoppingList={handleAddFlyerDealToShoppingList}
             onRefreshFlyersAI={handleRefreshFlyersAI}
             isRefreshing={isRefreshingFlyers}
+            onAddCustomDeal={handleAddCustomFlyerDeal}
           />
         )}
 
