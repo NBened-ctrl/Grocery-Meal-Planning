@@ -35,7 +35,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Prom
 }
 
 // Multi-model resilient generator with automatic failover
-const VALID_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.7-flash'];
+const VALID_GEMINI_MODELS = ['gemini-3.7-flash', 'gemini-3.1-flash-lite'];
 
 async function generateContentWithFallback(
   ai: GoogleGenAI,

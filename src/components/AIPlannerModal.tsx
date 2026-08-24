@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Sparkles, Wand2, Loader2, CheckCircle2, DollarSign, Clock, Store, CookingPot, Calendar, Sun, CloudSun, Leaf, Snowflake, Check, Star } from 'lucide-react';
 import { FamilySettings, FlyerDeal, MealRecipe } from '../types';
 import { MONTHS_LIST, ONTARIO_SEASONAL_METADATA, getSeasonalInfo } from '../data/seasonalData';
-import { DEFAULT_WEEKLY_MEAL_PLAN } from '../data/sampleMealPlans';
+import { getScaledWeeklyMealPlan, WEEKLY_MEAL_PLAN_VARIANTS } from '../data/sampleMealPlans';
 
 interface AIPlannerModalProps {
   isOpen: boolean;
@@ -45,7 +45,18 @@ export const AIPlannerModal: React.FC<AIPlannerModalProps> = ({
     const portionScale = Math.max(0.75, (adults * 1.0 + kids * 0.5) / 3.0);
     const ts = Date.now();
 
-    const scaledMeals = DEFAULT_WEEKLY_MEAL_PLAN.map((meal, idx) => {
+    // Select variant based on prompt keywords or random rotation
+    let variantIndex = Math.floor(Math.random() * WEEKLY_MEAL_PLAN_VARIANTS.length);
+    const textLower = (customText || prompt || '').toLowerCase();
+    if (textLower.includes('fast') || textLower.includes('quick') || textLower.includes('20-min')) {
+      variantIndex = 2;
+    } else if (textLower.includes('comfort') || textLower.includes('greek') || textLower.includes('harvest')) {
+      variantIndex = 1;
+    }
+
+    const baseVariant = WEEKLY_MEAL_PLAN_VARIANTS[variantIndex] || WEEKLY_MEAL_PLAN_VARIANTS[0];
+
+    const scaledMeals = baseVariant.map((meal, idx) => {
       const isOnePotStyle = preferOnePot || meal.isOnePotOrPan;
       return {
         ...meal,

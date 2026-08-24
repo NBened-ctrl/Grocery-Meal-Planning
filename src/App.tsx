@@ -41,7 +41,9 @@ import {
   INITIAL_FLYER_DEALS 
 } from './data/flyersData';
 import { 
-  DEFAULT_WEEKLY_MEAL_PLAN 
+  DEFAULT_WEEKLY_MEAL_PLAN,
+  getScaledWeeklyMealPlan,
+  WEEKLY_MEAL_PLAN_VARIANTS,
 } from './data/sampleMealPlans';
 import { 
   DEFAULT_PANTRY_STAPLES 
@@ -123,6 +125,7 @@ export default function App() {
   const [isAIModalOpen, setIsAIModalOpen] = useState<boolean>(false);
   const [isRefreshingFlyers, setIsRefreshingFlyers] = useState<boolean>(false);
   const [isGeneratingPlanOnDemand, setIsGeneratingPlanOnDemand] = useState<boolean>(false);
+  const [planVariantIndex, setPlanVariantIndex] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Persistence to localStorage
@@ -498,13 +501,19 @@ export default function App() {
   const handleGenerateNewMealPlanOnDemand = async () => {
     if (isGeneratingPlanOnDemand) return;
     setIsGeneratingPlanOnDemand(true);
-    showToast('Re-running Waterloo Flipp flyer script & syncing deals...');
+    const nextVariant = planVariantIndex + 1;
+    setPlanVariantIndex(nextVariant);
+    showToast('Syncing Waterloo flyer specials & creating new 7-day dinner plan...');
+
+    const adults = familySettings.adultsCount ?? 2;
+    const kids = familySettings.kidsCount ?? 2;
+    const month = familySettings.selectedMonth || 'August';
 
     try {
       const postal = flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 3E4';
       let activeDeals = deals;
 
-      // 1. Re-run Waterloo flyer script
+      // 1. Refresh/sync flyer specials from backend
       try {
         const flyerRes = await fetch('/api/refresh-flyers', {
           method: 'POST',
@@ -536,25 +545,27 @@ export default function App() {
         console.warn('Flyer script sync note:', fErr);
       }
 
-      showToast('Generating fresh 7-day dinner plan & grocery list...');
-
-      // 2. Produce fresh 7-day meal plan based on active deals & family settings
-      const planRes = await fetch('/api/generate-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          familySettings,
-          currentDeals: activeDeals,
-          customPrompt: 'Fresh budget-friendly 7-day family dinner plan utilizing this week flyer specials.',
-          selectedMonth: familySettings.selectedMonth || 'August',
-          preferOnePotPan: familySettings.preferOnePotPan,
-        }),
-      });
-
-      const planContentType = planRes.headers.get('content-type') || '';
+      // 2. Try fetching AI / server generated meal plan
       let planData: any = null;
-      if (planRes.ok && planContentType.includes('application/json')) {
-        planData = await planRes.json();
+      try {
+        const planRes = await fetch('/api/generate-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            familySettings,
+            currentDeals: activeDeals,
+            customPrompt: 'Fresh budget-friendly 7-day family dinner plan utilizing this week flyer specials.',
+            selectedMonth: month,
+            preferOnePotPan: familySettings.preferOnePotPan,
+          }),
+        });
+
+        const planContentType = planRes.headers.get('content-type') || '';
+        if (planRes.ok && planContentType.includes('application/json')) {
+          planData = await planRes.json();
+        }
+      } catch (pErr) {
+        console.warn('Server plan generation note:', pErr);
       }
 
       if (planData && planData.meals && Array.isArray(planData.meals) && planData.meals.length > 0) {
@@ -562,50 +573,16 @@ export default function App() {
         setCurrentTab('meals');
         showToast('🎉 New 7-Day Meal Plan & Grocery List ready!');
       } else {
-        // Instant reliable client-side fresh generation
-        const adults = familySettings.adultsCount ?? 2;
-        const kids = familySettings.kidsCount ?? 2;
-        const totalPeople = adults + kids;
-        const portionScale = Math.max(0.75, (adults * 1.0 + kids * 0.5) / 3.0);
-        const ts = Date.now();
-
-        const freshMeals = DEFAULT_WEEKLY_MEAL_PLAN.map((meal, idx) => ({
-          ...meal,
-          id: `meal-ondemand-${meal.dayOfWeek.toLowerCase()}-${ts}-${idx}`,
-          servings: totalPeople,
-          estimatedCostTotal: Number((meal.estimatedCostTotal * portionScale).toFixed(2)),
-          costPerServing: Number(((meal.estimatedCostTotal * portionScale) / totalPeople).toFixed(2)),
-          ingredients: meal.ingredients.map(ing => ({
-            ...ing,
-            estimatedPrice: ing.estimatedPrice ? Number((ing.estimatedPrice * (ing.isPantryStaple ? 1 : portionScale)).toFixed(2)) : undefined,
-          })),
-        }));
-
-        setMeals(freshMeals);
+        // Robust instant multi-variant scaled local generation
+        const generated = getScaledWeeklyMealPlan(nextVariant, adults, kids, month);
+        setMeals(generated.meals);
         setCurrentTab('meals');
         showToast('🎉 New 7-Day Meal Plan & Grocery List ready!');
       }
     } catch (err) {
-      console.warn('Sync note during on-demand plan generation, applying fresh local plan:', err);
-      const adults = familySettings.adultsCount ?? 2;
-      const kids = familySettings.kidsCount ?? 2;
-      const totalPeople = adults + kids;
-      const portionScale = Math.max(0.75, (adults * 1.0 + kids * 0.5) / 3.0);
-      const ts = Date.now();
-
-      const freshMeals = DEFAULT_WEEKLY_MEAL_PLAN.map((meal, idx) => ({
-        ...meal,
-        id: `meal-ondemand-${meal.dayOfWeek.toLowerCase()}-${ts}-${idx}`,
-        servings: totalPeople,
-        estimatedCostTotal: Number((meal.estimatedCostTotal * portionScale).toFixed(2)),
-        costPerServing: Number(((meal.estimatedCostTotal * portionScale) / totalPeople).toFixed(2)),
-        ingredients: meal.ingredients.map(ing => ({
-          ...ing,
-          estimatedPrice: ing.estimatedPrice ? Number((ing.estimatedPrice * (ing.isPantryStaple ? 1 : portionScale)).toFixed(2)) : undefined,
-        })),
-      }));
-
-      setMeals(freshMeals);
+      console.warn('Error during on-demand plan generation, applying fresh variant:', err);
+      const generated = getScaledWeeklyMealPlan(nextVariant, adults, kids, month);
+      setMeals(generated.meals);
       setCurrentTab('meals');
       showToast('🎉 New 7-Day Meal Plan & Grocery List ready!');
     } finally {
