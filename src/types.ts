@@ -1,5 +1,7 @@
 export type KWStore = 'Food Basics' | 'Real Canadian Superstore' | 'Zehrs' | 'Sobeys';
 
+export type FlyerSourceType = 'direct_store' | 'flipp' | 'hybrid';
+
 export type DealCategory = 
   | 'Meat & Poultry'
   | 'Seafood'
@@ -23,6 +25,9 @@ export interface FlyerDeal {
   suggestedProtein?: string;
   suggestedVeg?: string;
   suggestedStarch?: string;
+  sourceType?: FlyerSourceType; // Direct store official website vs Flipp vs Hybrid
+  directStoreVerified?: boolean; // Verified directly on grocery store's official flyer website
+  directStoreUrl?: string; // Direct link to store's official online weekly flyer (foodbasics.ca, zehrs.ca, etc.)
   flippVerified?: boolean; // Verified against Flipp Waterloo flyers
   flippUrl?: string; // Direct link or search query URL to Flipp digital flyer
   reebeeVerified?: boolean; // Backwards compatible alias
@@ -133,6 +138,7 @@ export interface FamilySettings {
   preferOnePotPan?: boolean; // Toggle for 1-pot / 1-pan / sheet-pan recipes
   selectedMonth: string; // e.g. "August"
   recipeRatings?: Record<string, RecipeRating>; // Ratings database for recipe intelligence
+  flyerSourcePreference?: FlyerSourceType; // 'direct_store' | 'flipp' | 'hybrid'
 }
 
 export interface PantryItem {
@@ -144,13 +150,17 @@ export interface PantryItem {
 
 export interface FlyerWeekInfo {
   cycleName: string;
-  validFrom: string; // e.g., "Thursday, Aug 20"
-  validTo: string;   // e.g., "Wednesday, Aug 26"
+  validFrom: string; // e.g., "Thursday, Aug 20, 2026"
+  validTo: string;   // e.g., "Wednesday, Aug 26, 2026"
+  shortRange?: string; // e.g., "Aug 20 – Aug 26"
   location: string;  // "Waterloo, ON"
   lastUpdated: string;
+  activeSource: FlyerSourceType; // 'direct_store' | 'flipp' | 'hybrid'
+  directStoreSyncSource?: string; // e.g. "Official Store Portals (FoodBasics.ca, Zehrs.ca, RealCanadianSuperstore.ca, Sobeys.com)"
   flippSyncSource?: string; // e.g. "Flipp Digital Circulars (Waterloo, ON)"
   flippPostalCode?: string; // e.g. "N2L 3E4"
   reebeeSyncSource?: string; // Backwards compatible alias
   reebeePostalCode?: string;
   totalDealsTracked?: number;
+  isCurrentCycleVerified?: boolean;
 }

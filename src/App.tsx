@@ -34,11 +34,13 @@ import {
   FamilySettings, 
   PantryItem, 
   FlyerWeekInfo,
-  KWStore 
+  KWStore,
+  FlyerSourceType 
 } from './types';
 import { 
   CURRENT_FLYER_WEEK, 
-  INITIAL_FLYER_DEALS 
+  INITIAL_FLYER_DEALS,
+  getCurrentFlyerCycle 
 } from './data/flyersData';
 import { 
   DEFAULT_WEEKLY_MEAL_PLAN,
@@ -453,17 +455,20 @@ export default function App() {
     showToast('Applied AI Generated 7-Day Dinner Plan!');
   };
 
-  const handleRefreshFlyersAI = async (postalCode?: string) => {
-    const postal = postalCode || flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 3E4';
+  const handleRefreshFlyersAI = async (postalCode?: string, source: FlyerSourceType = 'direct_store') => {
+    const postal = postalCode || flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 6A6';
     setIsRefreshingFlyers(true);
-    showToast(`Syncing Flipp flyers for Waterloo (${postal})...`);
+    const sourceLabel = source === 'direct_store' ? 'Direct Store Portals (Food Basics, Superstore, Zehrs, Sobeys)' : source === 'hybrid' ? 'Direct Store & Flipp Hybrid' : 'Flipp Circulars';
+    showToast(`Syncing current flyers via ${sourceLabel} (${postal})...`);
     try {
+      const activeCycle = getCurrentFlyerCycle();
       const res = await fetch('/api/refresh-flyers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          cycleDate: 'Aug 20 - Aug 26, 2026',
+          cycleDate: activeCycle.cycleName,
           postalCode: postal,
+          source: source,
         }),
       });
 
@@ -477,21 +482,23 @@ export default function App() {
         setDeals(data.deals);
         setFlyerWeek((prev) => ({
           ...prev,
-          validFrom: data.validFrom || prev.validFrom,
-          validTo: data.validTo || prev.validTo,
-          lastUpdated: `Synced via Flipp (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
-          flippSyncSource: 'Flipp.com Waterloo Digital Circulars',
+          cycleName: data.cycleLabel || data.cycleName || activeCycle.cycleName,
+          validFrom: data.validFrom || activeCycle.validFrom,
+          validTo: data.validTo || activeCycle.validTo,
+          lastUpdated: `Synced via ${data.sourceLabel || sourceLabel} (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+          sourceType: source,
+          flippSyncSource: source === 'flipp' ? 'Flipp.com Waterloo Digital Circulars' : 'Official Grocery Store Websites & Circulars',
           flippPostalCode: postal,
-          reebeeSyncSource: 'Flipp.com Waterloo Digital Circulars',
+          reebeeSyncSource: 'Official Store Portals & Flipp',
           reebeePostalCode: postal,
           totalDealsTracked: data.deals.length,
         }));
-        showToast(`Synced ${data.deals.length} verified Flipp deals for ${postal}!`);
+        showToast(`Synced ${data.deals.length} active deals from current flyer cycle for ${postal}!`);
       } else {
-        showToast('Using verified Flipp Waterloo Thursday flyer database.');
+        showToast('Using verified Waterloo Thursday flyer database with active cycle dates.');
       }
     } catch (e) {
-      showToast('Using verified Flipp Waterloo Thursday flyer database.');
+      showToast('Using verified Waterloo Thursday flyer database with active cycle dates.');
     } finally {
       setIsRefreshingFlyers(false);
     }
@@ -503,15 +510,16 @@ export default function App() {
     setIsGeneratingPlanOnDemand(true);
     const nextVariant = planVariantIndex + 1;
     setPlanVariantIndex(nextVariant);
-    showToast('Syncing Waterloo flyer specials & creating new 7-day dinner plan...');
+    showToast('Syncing current flyer specials & creating new 7-day dinner plan...');
 
     const adults = familySettings.adultsCount ?? 2;
     const kids = familySettings.kidsCount ?? 2;
     const month = familySettings.selectedMonth || 'August';
 
     try {
-      const postal = flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 3E4';
+      const postal = flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 6A6';
       let activeDeals = deals;
+      const activeCycle = getCurrentFlyerCycle();
 
       // 1. Refresh/sync flyer specials from backend
       try {
@@ -519,8 +527,9 @@ export default function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            cycleDate: 'Aug 20 - Aug 26, 2026',
+            cycleDate: activeCycle.cycleName,
             postalCode: postal,
+            source: familySettings.flyerSourcePreference || 'direct_store',
           }),
         });
 
@@ -532,10 +541,12 @@ export default function App() {
             setDeals(flyerData.deals);
             setFlyerWeek((prev) => ({
               ...prev,
-              validFrom: flyerData.validFrom || prev.validFrom,
-              validTo: flyerData.validTo || prev.validTo,
-              lastUpdated: `Synced via Flipp (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
-              flippSyncSource: 'Flipp.com Waterloo Digital Circulars',
+              cycleName: flyerData.cycleLabel || flyerData.cycleName || activeCycle.cycleName,
+              validFrom: flyerData.validFrom || activeCycle.validFrom,
+              validTo: flyerData.validTo || activeCycle.validTo,
+              lastUpdated: `Synced via ${flyerData.sourceLabel || 'Direct Store Portals'} (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+              sourceType: familySettings.flyerSourcePreference || 'direct_store',
+              flippSyncSource: 'Official Grocery Store Portals & Flipp',
               flippPostalCode: postal,
               totalDealsTracked: flyerData.deals.length,
             }));

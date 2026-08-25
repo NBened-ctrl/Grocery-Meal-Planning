@@ -19,26 +19,60 @@ import {
   ShieldCheck,
   Zap,
   SlidersHorizontal,
+  Globe,
   X
 } from 'lucide-react';
-import { FlyerDeal, KWStore, DealCategory, FlyerWeekInfo } from '../types';
+import { FlyerDeal, KWStore, DealCategory, FlyerWeekInfo, FlyerSourceType } from '../types';
 import { STORE_METADATA } from '../data/flyersData';
 
 interface FlyerBrowserProps {
   deals: FlyerDeal[];
   flyerWeek: FlyerWeekInfo;
   onAddDealToShoppingList: (deal: FlyerDeal) => void;
-  onRefreshFlyersAI: (postalCode?: string) => void;
+  onRefreshFlyersAI: (postalCode?: string, source?: FlyerSourceType) => void;
   isRefreshing: boolean;
   onAddCustomDeal?: (deal: FlyerDeal) => void;
 }
 
 const WATERLOO_POSTAL_CODES = [
-  { code: 'N2T 1H4', label: 'N2T - Beechwood (Zehrs Beechwood & Food Basics Erb St)' },
-  { code: 'N2N 2Y2', label: 'N2N - Fischer-Hallman & Highland (Real Canadian Superstore)' },
-  { code: 'N2L 3E4', label: 'N2L - University District / Columbia (Sobeys Columbia)' },
-  { code: 'N2J 4H7', label: 'N2J - Lincoln Heights / Uptown Waterloo' },
-  { code: 'N2V 1Z8', label: 'N2V - Westvale / Erbsville / The Boardwalk' },
+  { code: 'N2L 6A6', label: 'N2L 6A6 - Waterloo (Lakeshore / Northfield / University & Conestoga - Primary)' },
+  { code: 'N2T 1H4', label: 'N2T 1H4 - Beechwood (Zehrs Beechwood & Food Basics Erb St)' },
+  { code: 'N2N 2Y2', label: 'N2N 2Y2 - Fischer-Hallman & Highland (Superstore & Boardwalk)' },
+  { code: 'N2L 3E4', label: 'N2L 3E4 - University District / Columbia (Sobeys Columbia)' },
+  { code: 'N2J 4H7', label: 'N2J 4H7 - Lincoln Heights / Uptown Waterloo' },
+  { code: 'N2V 1Z8', label: 'N2V 1Z8 - Westvale / Erbsville / The Boardwalk' },
+];
+
+const DIRECT_STORE_HUBS_CONFIG: Array<{
+  store: KWStore;
+  getUrl: (postal: string) => string;
+  label: string;
+  badge: string;
+}> = [
+  { 
+    store: 'Food Basics', 
+    getUrl: (p) => `https://www.foodbasics.ca/flyer.en.html?postalCode=${p.replace(/\s+/g, '') || 'N2L6A6'}`, 
+    label: 'FoodBasics.ca Flyer', 
+    badge: 'Discount Leader' 
+  },
+  { 
+    store: 'Real Canadian Superstore', 
+    getUrl: () => 'https://www.realcanadiansuperstore.ca/print-flyer', 
+    label: 'Superstore.ca Flyer', 
+    badge: 'PC Optimum Deals' 
+  },
+  { 
+    store: 'Zehrs', 
+    getUrl: () => 'https://www.zehrs.ca/print-flyer', 
+    label: 'Zehrs.ca Flyer', 
+    badge: 'Fresh & Meat' 
+  },
+  { 
+    store: 'Sobeys', 
+    getUrl: (p) => `https://www.sobeys.com/en/flyer/?postalCode=${p.replace(/\s+/g, '') || 'N2L6A6'}`, 
+    label: 'Sobeys.com Flyer', 
+    badge: 'Weekly Specials' 
+  },
 ];
 
 export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
@@ -55,9 +89,10 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
   const [onlyLossLeaders, setOnlyLossLeaders] = useState<boolean>(false);
   const [addedDealIds, setAddedDealIds] = useState<Record<string, boolean>>({});
   const [isBannerCollapsed, setIsBannerCollapsed] = useState<boolean>(false);
-  const [selectedPostalCode, setSelectedPostalCode] = useState<string>(flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 3E4');
+  const [selectedPostalCode, setSelectedPostalCode] = useState<string>(flyerWeek.flippPostalCode || flyerWeek.reebeePostalCode || 'N2L 6A6');
+  const [selectedSource, setSelectedSource] = useState<FlyerSourceType>(flyerWeek.sourceType || 'direct_store');
 
-  // Flipp live item search state
+  // Live item search state
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
   const [isSearchingLive, setIsSearchingLive] = useState<boolean>(false);
   const [liveSearchResults, setLiveSearchResults] = useState<FlyerDeal[] | null>(null);
@@ -81,7 +116,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
     salePrice: '',
     regularPrice: '',
     unit: 'per lb',
-    discountLabel: 'Flipp Deal',
+    discountLabel: 'Store Flyer Deal',
     isLossLeader: false,
   });
 
@@ -103,8 +138,8 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
     }, 2000);
   };
 
-  const handleTriggerFlippSync = () => {
-    onRefreshFlyersAI(selectedPostalCode);
+  const handleTriggerSync = () => {
+    onRefreshFlyersAI(selectedPostalCode, selectedSource);
   };
 
   const handleExecuteLiveSearch = async (e?: React.FormEvent) => {
@@ -114,12 +149,14 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
     setIsSearchingLive(true);
     setLiveSearchError(null);
     try {
-      const res = await fetch('/api/flipp-search', {
+      const endpoint = selectedSource === 'direct_store' ? '/api/store-flyer-search' : '/api/flipp-search';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: liveSearchQuery.trim(),
           postalCode: selectedPostalCode,
+          source: selectedSource,
         }),
       });
 
@@ -158,18 +195,22 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
     const sale = parseFloat(manualDeal.salePrice) || 0;
     const reg = parseFloat(manualDeal.regularPrice) || sale * 1.3;
     const cleanPostal = selectedPostalCode.replace(/\s+/g, '');
+    const meta = STORE_METADATA[manualDeal.store];
 
     const newDeal: FlyerDeal = {
-      id: `manual-flipp-${Date.now()}`,
+      id: `manual-deal-${Date.now()}`,
       store: manualDeal.store,
       name: manualDeal.name.trim(),
       category: manualDeal.category,
       salePrice: sale,
       regularPrice: reg,
       unit: manualDeal.unit || 'each',
-      discountLabel: manualDeal.discountLabel || 'Flipp Clipped Price',
+      discountLabel: manualDeal.discountLabel || 'Store Flyer Deal',
       validUntil: flyerWeek.validTo,
       isLossLeader: manualDeal.isLossLeader,
+      sourceType: selectedSource,
+      directStoreVerified: true,
+      directStoreUrl: meta?.flyerUrl,
       flippVerified: true,
       flippUrl: `https://flipp.com/search?postal_code=${cleanPostal}&query=${encodeURIComponent(manualDeal.name)}`,
       reebeeVerified: true,
@@ -189,7 +230,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
       salePrice: '',
       regularPrice: '',
       unit: 'per lb',
-      discountLabel: 'Flipp Deal',
+      discountLabel: 'Store Flyer Deal',
       isLossLeader: false,
     });
   };
@@ -213,14 +254,14 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Flipp Integration Header & Sync Banner */}
+      {/* Flyer Integration Header & Sync Banner */}
       <div className="bg-white rounded-2xl border border-stone-200/90 shadow-xs overflow-hidden">
-        {/* Top Dark Bar with Flipp Status & Postal Code */}
-        <div className="p-4 sm:p-5 bg-stone-900 text-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Top Dark Bar with Status, Source Selector & Postal Code */}
+        <div className="p-4 sm:p-5 bg-stone-900 text-stone-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-              <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-              Flipp Waterloo Live Sync
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              {selectedSource === 'direct_store' ? 'Official Store Websites' : selectedSource === 'hybrid' ? 'Store Websites + Flipp Hybrid' : 'Flipp.com Circulars'}
             </span>
             <span className="text-xs text-stone-300 font-normal flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-stone-400" />
@@ -229,6 +270,46 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Flyer Source Selector */}
+            <div className="flex items-center bg-stone-800 rounded-xl p-1 border border-stone-700 text-xs">
+              <button
+                type="button"
+                onClick={() => setSelectedSource('direct_store')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  selectedSource === 'direct_store'
+                    ? 'bg-emerald-600 text-white shadow-xs font-semibold'
+                    : 'text-stone-300 hover:text-white'
+                }`}
+                title="Direct grocery store websites (FoodBasics.ca, Superstore.ca, Zehrs.ca, Sobeys.com)"
+              >
+                Store Websites
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedSource('flipp')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  selectedSource === 'flipp'
+                    ? 'bg-emerald-600 text-white shadow-xs font-semibold'
+                    : 'text-stone-300 hover:text-white'
+                }`}
+                title="Flipp.com Digital Circulars"
+              >
+                Flipp
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedSource('hybrid')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  selectedSource === 'hybrid'
+                    ? 'bg-emerald-600 text-white shadow-xs font-semibold'
+                    : 'text-stone-300 hover:text-white'
+                }`}
+                title="Hybrid verification (Store portals + Flipp)"
+              >
+                Hybrid
+              </button>
+            </div>
+
             {/* Postal Code Selector */}
             <div className="flex items-center bg-stone-800 rounded-xl px-2 py-1 border border-stone-700 text-xs text-stone-200">
               <MapPin className="w-3.5 h-3.5 text-emerald-400 mr-1.5 shrink-0" />
@@ -248,13 +329,13 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
 
             {/* Sync Button */}
             <button
-              id="btn-refresh-flyers-flipp"
-              onClick={handleTriggerFlippSync}
+              id="btn-refresh-flyers-sync"
+              onClick={handleTriggerSync}
               disabled={isRefreshing}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-amber-200 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? 'Syncing...' : 'Sync Flipp Flyers'}</span>
+              <span>{isRefreshing ? 'Syncing...' : 'Sync Current Flyers'}</span>
             </button>
 
             {/* Manual Clip Button */}
@@ -282,35 +363,57 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
           <div className="p-5 sm:p-6 space-y-4 animate-fadeIn">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-serif text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
-                    Waterloo Grocery Flyers & Flipp.com Deals Engine
+                    Waterloo Grocery Store Flyers & Current Sales Hub
                   </h2>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 text-[11px] font-semibold">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                    Verified Flipp Prices
+                    Verified Thursday Flyer Cycle
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-stone-600 font-normal max-w-3xl mt-1 leading-relaxed">
-                  Real-time flyer deals pulled from Flipp.com digital circulars for Kitchener-Waterloo (Food Basics, Real Canadian Superstore, Zehrs, and Sobeys). Verified loss-leaders power weekly family dinner planning.
+                  Only active, current-cycle flyers from Kitchener-Waterloo grocery store websites (Food Basics, Real Canadian Superstore, Zehrs, and Sobeys) and Flipp circulars are utilized. Click any store below to browse their official weekly flyer directly.
                 </p>
               </div>
 
-              {/* Direct Flipp Circular Links */}
+              {/* Direct Store Flyer Quick Access Hub */}
               <div className="flex items-center gap-2 flex-wrap">
                 <a
                   href={`https://flipp.com/flyers?postal_code=${selectedPostalCode.replace(/\s+/g, '')}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-semibold border border-emerald-200 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-semibold border border-stone-200 transition-colors"
                 >
-                  <span>Open Flipp.com</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Flipp Waterloo</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-stone-600" />
                 </a>
               </div>
             </div>
 
-            {/* Store Tabs Grid with Direct Flipp Links */}
+            {/* Direct Grocery Store Official Website Hubs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+              {DIRECT_STORE_HUBS_CONFIG.map((hub) => (
+                <a
+                  key={hub.store}
+                  href={hub.getUrl(selectedPostalCode)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-3 bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-xl transition-all flex flex-col justify-between group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-xs text-emerald-950 truncate">{hub.store}</span>
+                    <ExternalLink className="w-3 h-3 text-emerald-700 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-emerald-800 font-medium">{hub.label}</span>
+                    <span className="text-[9px] bg-emerald-200/80 text-emerald-900 px-1.5 py-0.2 rounded font-medium">{hub.badge}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            {/* Store Tabs Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-3 border-t border-stone-100">
               <button
                 onClick={() => setSelectedStore('All')}
@@ -328,7 +431,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                 const count = deals.filter((d) => d.store === store).length;
                 const isSelected = selectedStore === store;
                 const meta = STORE_METADATA[store];
-                const directUrl = meta?.flippDirectUrl || meta?.reebeeDirectUrl;
+                const directUrl = meta?.directStoreFlyerUrl || meta?.flippDirectUrl;
 
                 return (
                   <div
@@ -355,7 +458,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                         href={directUrl}
                         target="_blank"
                         rel="noreferrer"
-                        title={`View ${store} flyer on Flipp`}
+                        title={`View ${store} weekly flyer`}
                         className={`absolute top-2.5 right-2.5 p-1 rounded-md transition-colors ${
                           isSelected ? 'text-stone-300 hover:text-white' : 'text-stone-400 hover:text-stone-900'
                         }`}
@@ -371,16 +474,16 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
         )}
       </div>
 
-      {/* Flipp Live Product Search Across Waterloo Flyers */}
+      {/* Live Product Search Across Waterloo Store Flyers */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h3 className="font-serif font-bold text-stone-900 text-base flex items-center gap-2">
               <Search className="w-4 h-4 text-emerald-700" />
-              Live Flipp Flyer Deal Search
+              Live Current Flyer Deal Search
             </h3>
             <p className="text-xs text-stone-500 font-normal mt-0.5">
-              Query any grocery item across all 4 Waterloo store circulars to verify prices on Flipp.com instantly.
+              Query any grocery item across all 4 Waterloo store flyer circulars to find current sales.
             </p>
           </div>
 
@@ -409,7 +512,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
               )}
             </div>
             <button
-              id="btn-submit-flipp-search"
+              id="btn-submit-flyer-search"
               type="submit"
               disabled={isSearchingLive || !liveSearchQuery.trim()}
               className="px-3.5 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition-colors shrink-0 flex items-center gap-1.5 shadow-xs"
@@ -435,7 +538,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-stone-800 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                Found {liveSearchResults.length} Flipp Results for "{liveSearchQuery}" ({selectedPostalCode})
+                Found {liveSearchResults.length} Results for "{liveSearchQuery}" ({selectedPostalCode})
               </span>
               <button
                 onClick={() => setLiveSearchResults(null)}
@@ -452,7 +555,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
                 {liveSearchResults.map((deal) => {
-                  const dealUrl = deal.flippUrl || deal.reebeeUrl;
+                  const dealUrl = deal.directStoreUrl || deal.flippUrl || deal.reebeeUrl;
                   return (
                     <div
                       key={deal.id}
@@ -482,7 +585,7 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                             rel="noreferrer"
                             className="text-[11px] text-emerald-800 hover:text-emerald-950 flex items-center gap-1 font-medium"
                           >
-                            <span>Flipp</span>
+                            <span>Flyer</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         )}
@@ -569,7 +672,9 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
             ((deal.regularPrice - deal.salePrice) / deal.regularPrice) * 100
           );
           const isAdded = addedDealIds[deal.id];
-          const dealUrl = deal.flippUrl || deal.reebeeUrl;
+          const storeMeta = STORE_METADATA[deal.store];
+          const storeDirectUrl = deal.directStoreUrl || storeMeta?.directStoreFlyerUrl;
+          const flippUrl = deal.flippUrl || deal.reebeeUrl;
 
           return (
             <div
@@ -596,7 +701,12 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                   </span>
 
                   <div className="flex items-center gap-1.5">
-                    {(deal.flippVerified || deal.reebeeVerified) && (
+                    {deal.directStoreVerified ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        Store Verified
+                      </span>
+                    ) : (deal.flippVerified || deal.reebeeVerified) && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         <ShieldCheck className="w-3 h-3 text-emerald-600" />
                         Flipp Verified
@@ -652,20 +762,36 @@ export const FlyerBrowser: React.FC<FlyerBrowserProps> = ({
                 )}
               </div>
 
-              {/* Action Buttons & Flipp Link */}
-              <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between gap-2">
-                {dealUrl && (
-                  <a
-                    href={dealUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[11px] font-medium text-stone-600 hover:text-stone-950 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-stone-100 transition-colors"
-                    title="View item on Flipp.com"
-                  >
-                    <span>View on Flipp</span>
-                    <ExternalLink className="w-3 h-3 text-stone-400" />
-                  </a>
-                )}
+              {/* Action Buttons & Direct Flyer Links */}
+              <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  {storeDirectUrl && (
+                    <a
+                      href={storeDirectUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] font-medium text-emerald-800 hover:text-emerald-950 flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50/80 hover:bg-emerald-100 transition-colors"
+                      title={`Open official ${deal.store} flyer website`}
+                    >
+                      <Globe className="w-3 h-3 text-emerald-700" />
+                      <span>Store Site</span>
+                      <ExternalLink className="w-2.5 h-2.5 text-emerald-600" />
+                    </a>
+                  )}
+
+                  {flippUrl && (
+                    <a
+                      href={flippUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] font-medium text-stone-500 hover:text-stone-900 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-stone-100 transition-colors"
+                      title="View on Flipp.com"
+                    >
+                      <span>Flipp</span>
+                      <ExternalLink className="w-2.5 h-2.5 text-stone-400" />
+                    </a>
+                  )}
+                </div>
 
                 <button
                   id={`btn-add-flyer-deal-${deal.id}`}

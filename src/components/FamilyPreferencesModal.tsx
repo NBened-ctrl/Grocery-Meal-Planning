@@ -285,6 +285,36 @@ export const FamilyPreferencesModal: React.FC<FamilyPreferencesModalProps> = ({
             </select>
           </div>
 
+          {/* Preferred Flyer Source */}
+          <div>
+            <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+              Weekly Flyer Data Source
+            </label>
+            <select
+              value={localSettings.flyerSourcePreference || 'direct_store'}
+              onChange={(e) =>
+                setLocalSettings({
+                  ...localSettings,
+                  flyerSourcePreference: e.target.value as any,
+                })
+              }
+              className="w-full px-3 py-2 text-sm bg-stone-50 border border-stone-200 rounded-xl font-medium text-stone-800 focus:outline-hidden focus:border-stone-500"
+            >
+              <option value="direct_store">
+                Direct Grocery Store Websites (FoodBasics.ca, Superstore.ca, Zehrs.ca, Sobeys.com)
+              </option>
+              <option value="hybrid">
+                Hybrid Mode (Direct Grocery Websites + Flipp Circular Verification)
+              </option>
+              <option value="flipp">
+                Flipp.com Digital Circulars
+              </option>
+            </select>
+            <p className="text-[11px] text-stone-500 font-normal mt-1">
+              Ensures current Thursday-to-Wednesday flyer cycles are used directly from store portals or circulars.
+            </p>
+          </div>
+
           {/* Max Cook Time */}
           <div>
             <div className="flex justify-between items-center mb-1.5">

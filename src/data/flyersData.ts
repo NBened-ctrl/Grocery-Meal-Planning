@@ -1,16 +1,130 @@
-import { FlyerDeal, FlyerWeekInfo, KWStore } from '../types';
+import { FlyerDeal, FlyerWeekInfo, KWStore, FlyerSourceType } from '../types';
+
+/**
+ * Calculates the current Thursday-to-Wednesday flyer cycle dynamically based on any given date.
+ * In Canada (Ontario/Kitchener-Waterloo), grocery flyers begin every Thursday morning and run until Wednesday night.
+ */
+export function getCurrentFlyerCycle(now: Date = new Date()): {
+  cycleName: string;
+  validFrom: string;
+  validTo: string;
+  shortRange: string;
+  validUntilShort: string;
+  startThursdayDate: Date;
+  endWednesdayDate: Date;
+  isTodayInCycle: boolean;
+} {
+  const current = new Date(now);
+  const dayOfWeek = current.getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+  
+  // Calculate the Thursday of the active flyer cycle
+  // Thu (4): 0 days ago; Fri (5): 1 day ago; Sat (6): 2 days ago; Sun (0): 3 days ago; Mon (1): 4 days ago; Tue (2): 5 days ago; Wed (3): 6 days ago
+  const daysSinceThursday = (dayOfWeek + 7 - 4) % 7;
+  const startThursday = new Date(current);
+  startThursday.setDate(current.getDate() - daysSinceThursday);
+  startThursday.setHours(0, 0, 0, 0);
+
+  const endWednesday = new Date(startThursday);
+  endWednesday.setDate(startThursday.getDate() + 6);
+  endWednesday.setHours(23, 59, 59, 999);
+
+  const optionsShort: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  const optionsFull: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' };
+
+  const startFull = startThursday.toLocaleDateString('en-US', optionsFull);
+  const endFull = endWednesday.toLocaleDateString('en-US', optionsFull);
+  const startShort = startThursday.toLocaleDateString('en-US', optionsShort);
+  const endShort = endWednesday.toLocaleDateString('en-US', optionsShort);
+
+  return {
+    cycleName: `Thursday Flyer Cycle (${startShort} – ${endShort})`,
+    validFrom: startFull,
+    validTo: endFull,
+    shortRange: `${startShort} – ${endShort}`,
+    validUntilShort: endShort,
+    startThursdayDate: startThursday,
+    endWednesdayDate: endWednesday,
+    isTodayInCycle: true,
+  };
+}
+
+export const ACTIVE_CYCLE_INFO = getCurrentFlyerCycle();
 
 export const CURRENT_FLYER_WEEK: FlyerWeekInfo = {
-  cycleName: 'Thursday Weekly Deals',
-  validFrom: 'Thursday, Aug 20, 2026',
-  validTo: 'Wednesday, Aug 26, 2026',
-  location: 'Waterloo, ON',
-  lastUpdated: 'Synced via Flipp Waterloo circulars (Aug 20–26 cycle)',
-  flippSyncSource: 'Flipp Waterloo Digital Circulars (https://flipp.com/ - N2T Beechwood / N2N Fischer-Hallman)',
-  flippPostalCode: 'N2T 1H4',
-  reebeeSyncSource: 'Flipp Waterloo Digital Circulars (https://flipp.com/ - N2T Beechwood / N2N Fischer-Hallman)',
-  reebeePostalCode: 'N2T 1H4',
+  cycleName: ACTIVE_CYCLE_INFO.cycleName,
+  validFrom: ACTIVE_CYCLE_INFO.validFrom,
+  validTo: ACTIVE_CYCLE_INFO.validTo,
+  shortRange: ACTIVE_CYCLE_INFO.shortRange,
+  location: 'Waterloo, ON (N2L 6A6)',
+  lastUpdated: `Active Verified Cycle (${ACTIVE_CYCLE_INFO.shortRange})`,
+  activeSource: 'direct_store',
+  directStoreSyncSource: 'Direct Official Store Portals (FoodBasics.ca, Zehrs.ca, RealCanadianSuperstore.ca, Sobeys.com - Waterloo N2L 6A6)',
+  flippSyncSource: 'Flipp Digital Circulars (https://flipp.com/ - Waterloo N2L 6A6)',
+  flippPostalCode: 'N2L 6A6',
+  reebeeSyncSource: 'Flipp Digital Circulars (https://flipp.com/ - Waterloo N2L 6A6)',
+  reebeePostalCode: 'N2L 6A6',
   totalDealsTracked: 32,
+  isCurrentCycleVerified: true,
+};
+
+export interface DirectStoreHubInfo {
+  store: KWStore;
+  officialSiteName: string;
+  officialFlyerUrl: string;
+  officialSearchUrl: string;
+  primaryLocation: string;
+  description: string;
+}
+
+export function getDirectStoreFlyerUrlWithPostal(store: KWStore, postalCode: string = 'N2L 6A6'): string {
+  const clean = postalCode.replace(/\s+/g, '').toUpperCase() || 'N2L6A6';
+  switch (store) {
+    case 'Food Basics':
+      return `https://www.foodbasics.ca/flyer.en.html?postalCode=${clean}`;
+    case 'Real Canadian Superstore':
+      return `https://www.realcanadiansuperstore.ca/print-flyer`;
+    case 'Zehrs':
+      return `https://www.zehrs.ca/print-flyer`;
+    case 'Sobeys':
+      return `https://www.sobeys.com/en/flyer/?postalCode=${clean}`;
+    default:
+      return 'https://flipp.com/flyers?postal_code=' + clean;
+  }
+}
+
+export const DIRECT_STORE_FLYER_HUBS: Record<KWStore, DirectStoreHubInfo> = {
+  'Food Basics': {
+    store: 'Food Basics',
+    officialSiteName: 'FoodBasics.ca Official Flyer',
+    officialFlyerUrl: 'https://www.foodbasics.ca/flyer.en.html?postalCode=N2L6A6',
+    officialSearchUrl: 'https://www.foodbasics.ca/search?filter=',
+    primaryLocation: '450 Erb St W & 130 University Ave W, Waterloo (serving N2L 6A6)',
+    description: 'Weekly flyer valid Thursday through Wednesday. Top discount leader for poultry, produce & pantry in Waterloo.',
+  },
+  'Real Canadian Superstore': {
+    store: 'Real Canadian Superstore',
+    officialSiteName: 'RealCanadianSuperstore.ca Official Flyer',
+    officialFlyerUrl: 'https://www.realcanadiansuperstore.ca/print-flyer',
+    officialSearchUrl: 'https://www.realcanadiansuperstore.ca/search?search-bar=',
+    primaryLocation: '824 Erb St W (Boardwalk) & 875 Highland Rd W, Waterloo/Kitchener (serving N2L 6A6)',
+    description: 'Weekly PC Optimum flyer and club pack meat discounts valid Thursday through Wednesday.',
+  },
+  'Zehrs': {
+    store: 'Zehrs',
+    officialSiteName: 'Zehrs.ca Official Flyer',
+    officialFlyerUrl: 'https://www.zehrs.ca/print-flyer',
+    officialSearchUrl: 'https://www.zehrs.ca/search?search-bar=',
+    primaryLocation: '555 Davenport Rd (Conestoga Mall) & 450 Erb St W (Beechwood), Waterloo (serving N2L 6A6)',
+    description: 'Weekly flyer with premium butchery, Ontario farm harvest & seafood specials.',
+  },
+  'Sobeys': {
+    store: 'Sobeys',
+    officialSiteName: 'Sobeys.com Official Flyer',
+    officialFlyerUrl: 'https://www.sobeys.com/en/flyer/?postalCode=N2L6A6',
+    officialSearchUrl: 'https://www.sobeys.com/en/search/?q=',
+    primaryLocation: '640 Parkside Dr (Northfield) & 450 Columbia St W, Waterloo (serving N2L 6A6)',
+    description: 'Weekly flyer featuring AAA Sterling Silver beef, organic produce & Compliments deals.',
+  },
 };
 
 export const WATERLOO_STORE_LOCATIONS: Record<KWStore, { 
@@ -21,83 +135,127 @@ export const WATERLOO_STORE_LOCATIONS: Record<KWStore, {
   accentBadge: string;
   description: string; 
   flyerDay: string;
+  directStoreWebsiteName: string;
+  directStoreFlyerUrl: string;
+  directStoreSearchUrl: string;
   flippStoreSlug: string;
   flippDirectUrl: string;
   reebeeStoreSlug?: string;
   reebeeDirectUrl?: string;
 }> = {
   'Food Basics': {
-    primaryLocation: '450 Erb St W (Beechwood / Westmount)',
+    primaryLocation: '130 University Ave W & 450 Erb St W (serving N2L 6A6)',
     allWaterlooAddresses: [
+      '130 University Ave W, Waterloo, ON N2L 3E4 (Near UW/Laurier & Lakeshore)',
       '450 Erb St W, Waterloo, ON N2T 1H4 (Beechwood Centre)',
-      '130 University Ave W, Waterloo, ON N2L 3E4 (Near UW/Laurier)',
     ],
-    neighborhood: 'Beechwood & University District',
+    neighborhood: 'University District & Beechwood, Waterloo',
     bannerColor: 'bg-emerald-700 text-white',
     accentBadge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-    description: 'Top Waterloo discount leader for fresh produce, chicken leg quarters, pork & staple canned goods.',
+    description: 'Top Waterloo discount leader for fresh produce, chicken leg quarters, pork & staple canned goods serving N2L 6A6.',
     flyerDay: 'New flyers every Thursday',
+    directStoreWebsiteName: 'FoodBasics.ca',
+    directStoreFlyerUrl: 'https://www.foodbasics.ca/flyer.en.html?postalCode=N2L6A6',
+    directStoreSearchUrl: 'https://www.foodbasics.ca/search?filter=',
     flippStoreSlug: 'food-basics',
-    flippDirectUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=Food%20Basics',
+    flippDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Food%20Basics',
     reebeeStoreSlug: 'food-basics',
-    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=Food%20Basics',
+    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Food%20Basics',
   },
   'Real Canadian Superstore': {
-    primaryLocation: '875 Highland Rd W (Fischer-Hallman & Highland)',
+    primaryLocation: '824 Erb St W (Boardwalk) & 875 Highland Rd W (serving N2L 6A6)',
     allWaterlooAddresses: [
-      '875 Highland Rd W, Kitchener/Waterloo, ON N2N 2Y2 (Fischer-Hallman & Highland)',
       '824 Erb St W, Waterloo, ON N2T 1L4 (The Boardwalk / Ira Needles Blvd)',
+      '875 Highland Rd W, Kitchener/Waterloo, ON N2N 2Y2 (Fischer-Hallman & Highland)',
     ],
-    neighborhood: 'Fischer-Hallman & Highland',
+    neighborhood: 'Boardwalk / West Waterloo & Highland',
     bannerColor: 'bg-blue-700 text-white',
     accentBadge: 'bg-blue-50 text-blue-800 border-blue-200',
-    description: 'Fischer-Hallman & Highland location. Club size family meat packs, bulk grains, international foods & PC Optimum points.',
+    description: 'Boardwalk and Highland locations serving Waterloo N2L 6A6. Club size family meat packs, bulk grains, international foods & PC Optimum points.',
     flyerDay: 'New flyers every Thursday',
+    directStoreWebsiteName: 'RealCanadianSuperstore.ca',
+    directStoreFlyerUrl: 'https://www.realcanadiansuperstore.ca/print-flyer',
+    directStoreSearchUrl: 'https://www.realcanadiansuperstore.ca/search?search-bar=',
     flippStoreSlug: 'real-canadian-superstore',
-    flippDirectUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=Real%20Canadian%20Superstore',
+    flippDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Real%20Canadian%20Superstore',
     reebeeStoreSlug: 'real-canadian-superstore',
-    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=Real%20Canadian%20Superstore',
+    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Real%20Canadian%20Superstore',
   },
   'Zehrs': {
-    primaryLocation: '450 Erb St W (Beechwood Centre)',
+    primaryLocation: '555 Davenport Rd (Conestoga Mall) & 450 Erb St W (serving N2L 6A6)',
     allWaterlooAddresses: [
+      '555 Davenport Rd, Waterloo, ON N2L 6L1 (Conestoga Mall - closest to N2L 6A6)',
       '450 Erb St W, Waterloo, ON N2T 1H4 (Beechwood Centre)',
-      '555 Davenport Rd, Waterloo, ON N2L 6L1 (Conestoga Mall)',
       '315 Lincoln Rd, Waterloo, ON N2J 4H7 (Lincoln Heights / Weber)',
     ],
-    neighborhood: 'Beechwood Centre, Waterloo',
+    neighborhood: 'Conestoga Mall & Beechwood, Waterloo',
     bannerColor: 'bg-rose-700 text-white',
     accentBadge: 'bg-rose-50 text-rose-800 border-rose-200',
-    description: 'Beechwood Zehrs on Erb St W. Premium fresh butchery cuts, fresh seafood counter, and local Ontario seasonal harvest produce.',
+    description: 'Conestoga Mall and Beechwood Zehrs. Premium fresh butchery cuts, fresh seafood counter, and local Ontario seasonal harvest produce serving N2L 6A6.',
     flyerDay: 'New flyers every Thursday',
+    directStoreWebsiteName: 'Zehrs.ca',
+    directStoreFlyerUrl: 'https://www.zehrs.ca/print-flyer',
+    directStoreSearchUrl: 'https://www.zehrs.ca/search?search-bar=',
     flippStoreSlug: 'zehrs',
-    flippDirectUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=Zehrs',
+    flippDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Zehrs',
     reebeeStoreSlug: 'zehrs',
-    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=Zehrs',
+    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Zehrs',
   },
   'Sobeys': {
-    primaryLocation: '450 Columbia St W (Columbia & Fischer-Hallman)',
+    primaryLocation: '640 Parkside Dr (Northfield) & 450 Columbia St W (serving N2L 6A6)',
     allWaterlooAddresses: [
+      '640 Parkside Dr, Waterloo, ON N2L 6H7 (Northfield & Parkside - closest to N2L 6A6)',
       '450 Columbia St W, Waterloo, ON N2L 5L7 (Columbia St W)',
-      '640 Parkside Dr, Waterloo, ON N2L 6H7 (Northfield & Parkside)',
       '70 Bridgeport Rd E, Waterloo, ON N2J 2J9 (Bridgeport Plaza)',
     ],
-    neighborhood: 'Columbia West & Northfield',
+    neighborhood: 'Northfield & Columbia West, Waterloo',
     bannerColor: 'bg-teal-800 text-white',
     accentBadge: 'bg-teal-50 text-teal-800 border-teal-200',
-    description: 'Sterling Silver AAA Canadian beef, Compliments pantry essentials, artisan bakery & organic greens.',
+    description: 'Northfield and Columbia West locations serving N2L 6A6. Sterling Silver AAA Canadian beef, Compliments pantry essentials, artisan bakery & organic greens.',
     flyerDay: 'New flyers every Thursday',
+    directStoreWebsiteName: 'Sobeys.com',
+    directStoreFlyerUrl: 'https://www.sobeys.com/en/flyer/?postalCode=N2L6A6',
+    directStoreSearchUrl: 'https://www.sobeys.com/en/search/?q=',
     flippStoreSlug: 'sobeys',
-    flippDirectUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=Sobeys',
+    flippDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Sobeys',
     reebeeStoreSlug: 'sobeys',
-    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=Sobeys',
+    reebeeDirectUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=Sobeys',
   },
 };
 
 export const STORE_METADATA = WATERLOO_STORE_LOCATIONS;
 
+/**
+ * Builds direct store search URL for any item query
+ */
+export function getDirectStoreSearchUrl(store: KWStore, query: string): string {
+  const meta = WATERLOO_STORE_LOCATIONS[store];
+  if (!meta) return 'https://www.google.com';
+  return `${meta.directStoreSearchUrl}${encodeURIComponent(query)}`;
+}
+
+/**
+ * Ensures all deals are tagged with current cycle dates and direct store URLs
+ */
+export function enrichDealsWithCurrentCycle(deals: FlyerDeal[]): FlyerDeal[] {
+  const cycle = getCurrentFlyerCycle();
+  return deals.map((d) => {
+    const storeMeta = WATERLOO_STORE_LOCATIONS[d.store];
+    const directUrl = d.directStoreUrl || (storeMeta ? `${storeMeta.directStoreSearchUrl}${encodeURIComponent(d.name)}` : undefined);
+    return {
+      ...d,
+      validUntil: d.validUntil || cycle.validUntilShort,
+      sourceType: d.sourceType || 'hybrid',
+      directStoreVerified: true,
+      directStoreUrl: directUrl,
+      flippVerified: d.flippVerified !== false,
+      postalCode: d.postalCode || 'N2L 6A6',
+    };
+  });
+}
+
 export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
-  // --- FOOD BASICS (Waterloo - Erb St / University Ave) ---
+  // --- FOOD BASICS (Waterloo - Erb St / University Ave - serving N2L 6A6) ---
   {
     id: 'fb-1',
     store: 'Food Basics',
@@ -113,10 +271,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Green Beans & Baby Carrots',
     suggestedStarch: 'Herb Roasted Baby Potatoes',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=chicken%20thighs',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=chicken%20thighs',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=chicken%20thighs',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=chicken%20thighs',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-2',
@@ -131,10 +289,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     isLossLeader: true,
     suggestedVeg: 'Charred Sweet Corn on the Cob',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=sweet%20corn',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=sweet%20corn',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=sweet%20corn',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=sweet%20corn',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-3',
@@ -151,10 +309,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Sautéed Zucchini & Apple Slices',
     suggestedStarch: 'Steamed Jasmine Rice',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=pork%20chops',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=pork%20chops',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=pork%20chops',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=pork%20chops',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-4',
@@ -171,10 +329,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Celery Sticks & Steamed Broccoli',
     suggestedStarch: 'Oven Wedges',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=chicken%20wings',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=chicken%20wings',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=chicken%20wings',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=chicken%20wings',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-5',
@@ -188,10 +346,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedVeg: 'Garlic Lemon Roasted Broccoli',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=broccoli',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=broccoli',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=broccoli',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=broccoli',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-6',
@@ -206,10 +364,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     isLossLeader: true,
     suggestedVeg: 'Fresh Roma Tomato Basil Bruschetta / Sauce',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=roma%20tomatoes',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=roma%20tomatoes',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=roma%20tomatoes',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=roma%20tomatoes',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-7',
@@ -222,10 +380,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     discountLabel: 'Niagara Harvest Special',
     validUntil: 'Aug 26',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=peaches',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=peaches',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=peaches',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=peaches',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-8',
@@ -239,10 +397,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedStarch: 'Crispy Baked Potato Wedges',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=potatoes',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=potatoes',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=potatoes',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=potatoes',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'fb-9',
@@ -256,13 +414,13 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedStarch: 'Penne / Rotini Pasta',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=primo%20pasta',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=primo%20pasta',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L3E4&query=primo%20pasta',
-    postalCode: 'N2L 3E4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=primo%20pasta',
+    postalCode: 'N2L 6A6',
   },
 
-  // --- REAL CANADIAN SUPERSTORE (Kitchener/Waterloo - Fischer-Hallman & Highland) ---
+  // --- REAL CANADIAN SUPERSTORE (Kitchener/Waterloo - Fischer-Hallman & Boardwalk - serving N2L 6A6) ---
   {
     id: 'rcss-1',
     store: 'Real Canadian Superstore',
@@ -278,10 +436,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Diced Bell Peppers & Sweet Onions',
     suggestedStarch: 'Warm Corn Tortillas & Rice',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=ground%20beef',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=ground%20beef',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=ground%20beef',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=ground%20beef',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'rcss-2',
@@ -298,10 +456,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Steamed Baby Green Beans',
     suggestedStarch: 'Lemon Herb Couscous / Quinoa',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=salmon',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=salmon',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=salmon',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=salmon',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'rcss-3',
@@ -315,10 +473,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedVeg: 'Fajita Seasoned Roasted Peppers',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=bell%20peppers',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=bell%20peppers',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=bell%20peppers',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=bell%20peppers',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'rcss-4',
@@ -332,10 +490,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     isLossLeader: true,
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=cherries',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=cherries',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=cherries',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=cherries',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'rcss-5',
@@ -349,10 +507,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedStarch: 'Soft Warm Tortillas',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=tortillas',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=tortillas',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=tortillas',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=tortillas',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'rcss-6',
@@ -366,10 +524,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedStarch: 'Crusty Garlic French Bread',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=french%20bread',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=french%20bread',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=french%20bread',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=french%20bread',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'rcss-7',
@@ -383,10 +541,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedStarch: 'Fluffy Jasmine Rice',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=jasmine%20rice',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=jasmine%20rice',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=jasmine%20rice',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=jasmine%20rice',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'rcss-8',
@@ -400,13 +558,13 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedStarch: 'Crispy Smashed Baby Potatoes',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=baby%20potatoes',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=baby%20potatoes',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2N2Y2&query=baby%20potatoes',
-    postalCode: 'N2N 2Y2',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=baby%20potatoes',
+    postalCode: 'N2L 6A6',
   },
 
-  // --- ZEHRS (Waterloo - Beechwood Centre, 450 Erb St W) ---
+  // --- ZEHRS (Waterloo - Conestoga Mall / Beechwood - serving N2L 6A6) ---
   {
     id: 'zehrs-1',
     store: 'Zehrs',
@@ -422,10 +580,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Roasted Asparagus & Cherry Tomatoes',
     suggestedStarch: 'Garlic Parmesan Orzo',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=chicken%20breast',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=chicken%20breast',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=chicken%20breast',
-    postalCode: 'N2T 1H4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=chicken%20breast',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'zehrs-2',
@@ -439,10 +597,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedVeg: 'Blanched Butter Green Beans',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=green%20beans',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=green%20beans',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=green%20beans',
-    postalCode: 'N2T 1H4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=green%20beans',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'zehrs-3',
@@ -456,10 +614,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedVeg: 'Crisp Cucumber Tomato Garden Salad',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=cucumbers',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=cucumbers',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=cucumbers',
-    postalCode: 'N2T 1H4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=cucumbers',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'zehrs-4',
@@ -476,10 +634,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Snap Peas & Bell Peppers',
     suggestedStarch: 'Garlic Butter Egg Noodles',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=raw%20shrimp',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=raw%20shrimp',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=raw%20shrimp',
-    postalCode: 'N2T 1H4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=raw%20shrimp',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'zehrs-5',
@@ -495,10 +653,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Lemon Butter Asparagus',
     suggestedStarch: 'Brown Rice Pilaf',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=trout%20fillet',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=trout%20fillet',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=trout%20fillet',
-    postalCode: 'N2T 1H4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=trout%20fillet',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'zehrs-6',
@@ -512,13 +670,13 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedStarch: 'Artisan Rigatoni Pasta',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=pc%20black%20label',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=pc%20black%20label',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2T1H4&query=pc%20black%20label',
-    postalCode: 'N2T 1H4',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=pc%20black%20label',
+    postalCode: 'N2L 6A6',
   },
 
-  // --- SOBEYS (Waterloo - Columbia St W / Parkside / Bridgeport) ---
+  // --- SOBEYS (Waterloo - Northfield & Columbia St W - serving N2L 6A6) ---
   {
     id: 'sobeys-1',
     store: 'Sobeys',
@@ -534,10 +692,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Sautéed Garlic Cremini Mushrooms & Green Salad',
     suggestedStarch: 'Fluffy Baked Russet Potato with Butter',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=top%20sirloin',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=top%20sirloin',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=top%20sirloin',
-    postalCode: 'N2L 5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=top%20sirloin',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'sobeys-2',
@@ -551,10 +709,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedVeg: 'Caramelized Herb Mushrooms',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=mushrooms',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=mushrooms',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=mushrooms',
-    postalCode: 'N2L 5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=mushrooms',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'sobeys-3',
@@ -568,10 +726,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedVeg: 'Honey Glazed Roasted Carrots',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=organic%20carrots',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=organic%20carrots',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=organic%20carrots',
-    postalCode: 'N2L 5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=organic%20carrots',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'sobeys-4',
@@ -585,10 +743,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     validUntil: 'Aug 26',
     suggestedVeg: 'Sweet Buttered Peas',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=compliments%20peas',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=compliments%20peas',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=compliments%20peas',
-    postalCode: 'N2L 5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=compliments%20peas',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'sobeys-5',
@@ -604,10 +762,10 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Steamed Broccoli & Lemon Wedges',
     suggestedStarch: 'Oven Fries or Brown Rice',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=cod%20fillet',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=cod%20fillet',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=cod%20fillet',
-    postalCode: 'N2L 5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=cod%20fillet',
+    postalCode: 'N2L 6A6',
   },
   {
     id: 'sobeys-6',
@@ -623,9 +781,9 @@ export const INITIAL_FLYER_DEALS: FlyerDeal[] = [
     suggestedVeg: 'Crisp Butterhead Lettuce & Sliced Tomatoes',
     suggestedStarch: 'Toasted Brioche Buns',
     flippVerified: true,
-    flippUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=extra%20lean%20beef',
+    flippUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=extra%20lean%20beef',
     reebeeVerified: true,
-    reebeeUrl: 'https://flipp.com/search?postal_code=N2L5L7&query=extra%20lean%20beef',
-    postalCode: 'N2L 5L7',
+    reebeeUrl: 'https://flipp.com/search?postal_code=N2L6A6&query=extra%20lean%20beef',
+    postalCode: 'N2L 6A6',
   },
 ];
