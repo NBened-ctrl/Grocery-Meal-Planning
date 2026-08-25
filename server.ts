@@ -35,7 +35,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, errorMsg: string): Prom
 }
 
 // Multi-model resilient generator with automatic failover
-const VALID_GEMINI_MODELS = ['gemini-3.7-flash', 'gemini-3.1-flash-lite'];
+const VALID_GEMINI_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.7-flash',
+  'gemini-flash-latest',
+];
 
 async function generateContentWithFallback(
   ai: GoogleGenAI,
@@ -49,24 +53,40 @@ async function generateContentWithFallback(
   const timeoutMs = params.timeoutMs || 8000;
 
   for (const model of models) {
-    try {
-      const geminiPromise = ai.models.generateContent({
-        model: model,
-        contents: params.contents,
-        config: params.config,
-      });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const geminiPromise = ai.models.generateContent({
+          model: model,
+          contents: params.contents,
+          config: params.config,
+        });
 
-      const response = await withTimeout(
-        geminiPromise,
-        timeoutMs,
-        `Model ${model} request timed out`
-      );
+        const response = await withTimeout(
+          geminiPromise,
+          timeoutMs,
+          `Model ${model} request timed out`
+        );
 
-      if (response && response.text) {
-        return response.text;
+        if (response && response.text) {
+          return response.text;
+        }
+      } catch (err: any) {
+        const errMsg = err?.message || String(err);
+        const isUnavailable =
+          err?.status === 503 ||
+          errMsg.includes('503') ||
+          errMsg.includes('high demand') ||
+          errMsg.includes('UNAVAILABLE') ||
+          err?.status === 429;
+
+        if (isUnavailable && attempt === 0) {
+          // Brief pause before trying fallback or next attempt
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
+        // Try next model seamlessly
+        break;
       }
-    } catch (err: any) {
-      console.warn(`Gemini model ${model} response note:`, err?.message || err);
     }
   }
 
